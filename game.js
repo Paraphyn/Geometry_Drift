@@ -36,6 +36,11 @@ const platformCount = 8;
 let score = 0;
 let gameStarted = false;
 
+// Музыка
+const bgMusic = new Audio('music.mp3'); // <-- Путь к твоему аудиофайлу
+bgMusic.loop = true; // Зацикливаем музыку
+let musicStarted = false;
+
 // Инициализация платформ
 function initPlatforms() {
   platforms.length = 0;
@@ -54,7 +59,7 @@ initPlatforms();
 let moveLeft = false;
 let moveRight = false;
 
-window.addEventListener('touchstart', (e) => {
+function handleTouchStart(e) {
   e.preventDefault();
   const touchX = e.touches[0].clientX;
   if (touchX < window.innerWidth / 2) {
@@ -62,13 +67,24 @@ window.addEventListener('touchstart', (e) => {
   } else {
     moveRight = true;
   }
-}, { passive: false });
 
-window.addEventListener('touchend', (e) => {
+  // Запуск музыки при первом взаимодействии
+  if (!musicStarted) {
+    bgMusic.play().catch(err => {
+      console.log('Автозапуск звука заблокирован браузером:', err);
+    });
+    musicStarted = true;
+  }
+}
+
+function handleTouchEnd(e) {
   e.preventDefault();
   moveLeft = false;
   moveRight = false;
-}, { passive: false });
+}
+
+window.addEventListener('touchstart', handleTouchStart, { passive: false });
+window.addEventListener('touchend', handleTouchEnd, { passive: false });
 
 // Обработка изменения размеров окна
 window.addEventListener('resize', () => {
@@ -186,6 +202,15 @@ function restartGame() {
   initPlatforms();
 
   gameStarted = false;
+
+  // Останавливаем и перезапускаем музыку при рестарте
+  if (musicStarted) {
+    bgMusic.pause();
+    bgMusic.currentTime = 0;
+    bgMusic.play().catch(err => {
+      console.log('Ошибка воспроизведения музыки при рестарте:', err);
+    });
+  }
 }
 
 gameLoop();
