@@ -9,13 +9,21 @@ canvas.height = height;
 // Player settings
 const player = {
   x: width / 2,
-  y: height - 50,
+  y: height - 100,
   width: 30,
   height: 30,
-  vy: -10, // vertical speed
+  vy: 0, // vertical speed
   vx: 0,
   gravity: 0.5,
   jumpStrength: -12,
+};
+
+// Ground (starting platform)
+const ground = {
+  x: 0,
+  y: height - 30,
+  width: width,
+  height: 30,
 };
 
 // Platform settings
@@ -26,14 +34,16 @@ const platformCount = 8;
 
 // Score
 let score = 0;
+let gameStarted = false;
 
 // Init platforms
 function initPlatforms() {
+  platforms.length = 0; // clear existing
   let spacing = height / platformCount;
   for (let i = 0; i < platformCount; i++) {
     platforms.push({
       x: Math.random() * (width - platformWidth),
-      y: height - i * spacing
+      y: height - 100 - i * spacing
     });
   }
 }
@@ -68,7 +78,6 @@ window.addEventListener('resize', () => {
 
 // Main game loop
 function update() {
-  // Move player
   if (moveLeft) player.vx = -5;
   else if (moveRight) player.vx = 5;
   else player.vx = 0;
@@ -81,16 +90,20 @@ function update() {
   if (player.x < -player.width) player.x = width;
   if (player.x > width) player.x = -player.width;
 
-  // Scroll platforms and player up
+  // Scroll screen upward
   if (player.y < height / 2) {
-    platforms.forEach(p => p.y += Math.abs(player.vy));
-    score += Math.abs(player.vy);
+    let dy = height / 2 - player.y;
+    player.y = height / 2;
+    ground.y += dy;
+    platforms.forEach(p => p.y += dy);
+    score += dy;
+    gameStarted = true; // Player has left the ground
   }
 
   // Platform collision
   platforms.forEach(p => {
-    if (player.vy > 0 && 
-        player.x + player.width > p.x && 
+    if (player.vy > 0 &&
+        player.x + player.width > p.x &&
         player.x < p.x + platformWidth &&
         player.y + player.height > p.y &&
         player.y + player.height < p.y + platformHeight) {
@@ -98,7 +111,15 @@ function update() {
     }
   });
 
-  // Remove and add platforms
+  // Ground collision
+  if (!gameStarted && player.vy > 0 &&
+      player.y + player.height > ground.y &&
+      player.y + player.height < ground.y + ground.height + 10) {
+    player.vy = player.jumpStrength;
+    player.y = ground.y - player.height; // Stick on top
+  }
+
+  // Remove and add new platforms
   for (let i = 0; i < platforms.length; i++) {
     if (platforms[i].y > height) {
       platforms.splice(i, 1);
@@ -109,15 +130,20 @@ function update() {
     }
   }
 
-  // Game Over
-  if (player.y > height) {
-    alert('Game Over! Score: ' + Math.floor(score / 100));
-    document.location.reload();
+  // Game Over condition (only if left the ground)
+  if (gameStarted && player.y > height) {
+    restartGame();
   }
 }
 
 function draw() {
   ctx.clearRect(0, 0, width, height);
+
+  // Draw ground
+  if (ground.y < height) {
+    ctx.fillStyle = 'green';
+    ctx.fillRect(ground.x, ground.y, ground.width, ground.height);
+  }
 
   // Draw player
   ctx.fillStyle = 'cyan';
@@ -139,6 +165,27 @@ function gameLoop() {
   update();
   draw();
   requestAnimationFrame(gameLoop);
+}
+
+// Restart logic
+function restartGame() {
+  // Reset player
+  player.x = width / 2;
+  player.y = height - 100;
+  player.vy = 0;
+  player.vx = 0;
+
+  // Reset ground
+  ground.y = height - 30;
+
+  // Reset score
+  score = 0;
+
+  // Reset platforms
+  initPlatforms();
+
+  // Reset game state
+  gameStarted = false;
 }
 
 gameLoop();
