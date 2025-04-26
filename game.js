@@ -50,6 +50,10 @@ jumpSound.volume = 0.7;
 const fallSound = new Audio('fall.mp3');
 fallSound.volume = 0.9;
 
+// Grid variables
+let gridOffsetY = 0;
+const gridSpacing = 50;
+
 // Initialize platforms
 function initPlatforms() {
   platforms.length = 0;
@@ -105,7 +109,7 @@ window.addEventListener('resize', () => {
 
 // Update logic
 function update() {
-  if (restarting) return; // freeze update during restart pause
+  if (restarting) return; // Freeze update during restart pause
 
   if (moveLeft) player.vx = -5;
   else if (moveRight) player.vx = 5;
@@ -115,11 +119,11 @@ function update() {
   player.y += player.vy;
   player.vy += player.gravity;
 
-  // Wrap player around screen edges
+  // Wrap around edges
   if (player.x < -player.width) player.x = width;
   if (player.x > width) player.x = -player.width;
 
-  // Scroll screen upwards
+  // Scroll screen upward
   if (player.y < height / 2) {
     const dy = height / 2 - player.y;
     player.y = height / 2;
@@ -127,9 +131,12 @@ function update() {
     platforms.forEach(p => p.y += dy);
     score += dy;
     gameStarted = true;
+
+    // Move grid offset
+    gridOffsetY += dy;
   }
 
-  // Collision with platforms
+  // Platform collision
   platforms.forEach(p => {
     if (player.vy > 0 &&
         player.x + player.width > p.x &&
@@ -146,7 +153,7 @@ function update() {
     }
   });
 
-  // Collision with ground (only at start)
+  // Ground collision at start
   if (!gameStarted && player.vy > 0 &&
       player.y + player.height > ground.y &&
       player.y + player.height < ground.y + ground.height + 10) {
@@ -171,15 +178,44 @@ function update() {
     }
   }
 
-  // Game Over trigger
+  // Game over detection
   if (gameStarted && player.y > height && !restarting) {
     handleGameOver();
   }
 }
 
-// Drawing
+// Draw the infinite grid
+function drawGrid() {
+  ctx.save();
+  ctx.strokeStyle = 'rgba(0,255,255,0.5)';
+  ctx.lineWidth = 1;
+
+  const offset = gridOffsetY % gridSpacing;
+
+  // Vertical lines
+  for (let x = 0; x < width; x += gridSpacing) {
+    ctx.beginPath();
+    ctx.moveTo(x, -offset);
+    ctx.lineTo(x, height);
+    ctx.stroke();
+  }
+
+  // Horizontal lines
+  for (let y = -offset; y < height; y += gridSpacing) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(width, y);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+// Draw game
 function draw() {
   ctx.clearRect(0, 0, width, height);
+
+  drawGrid(); // draw the background grid first
 
   // Draw ground
   if (ground.y < height) {
@@ -210,16 +246,14 @@ function gameLoop() {
   requestAnimationFrame(gameLoop);
 }
 
-// Handle Game Over
+// Handle game over
 function handleGameOver() {
   restarting = true;
 
-  // Pause background music
   if (musicStarted) {
     bgMusic.pause();
   }
 
-  // Play fall sound
   fallSound.currentTime = 0;
   fallSound.play().catch(err => {
     console.log('Fall sound error:', err);
@@ -228,10 +262,10 @@ function handleGameOver() {
   setTimeout(() => {
     restartGame();
     restarting = false;
-  }, 2000); // 2 seconds pause
+  }, 2000); // 2-second delay
 }
 
-// Restart game
+// Restart the game
 function restartGame() {
   player.x = width / 2;
   player.y = height - 100;
@@ -241,12 +275,12 @@ function restartGame() {
   ground.y = height - 30;
 
   score = 0;
+  gridOffsetY = 0; // Reset grid scroll too
 
   initPlatforms();
 
   gameStarted = false;
 
-  // Restart background music
   if (musicStarted) {
     bgMusic.currentTime = 0;
     bgMusic.play().catch(err => {
@@ -255,5 +289,5 @@ function restartGame() {
   }
 }
 
-// Start the loop
+// Start the game
 gameLoop();
