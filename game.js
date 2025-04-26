@@ -1,3 +1,5 @@
+// game.js full code
+
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -6,7 +8,17 @@ let height = window.innerHeight;
 canvas.width = width;
 canvas.height = height;
 
-// Player settings
+const logoImage = new Image();
+logoImage.src = 'logo.png';
+
+// Game states
+let currentScreen = 'menu';
+let musicOn = true;
+let moveLeft = false;
+let moveRight = false;
+let frameCounter = 0;
+
+// Player
 const player = {
   x: width / 2,
   y: height - 100,
@@ -18,17 +30,11 @@ const player = {
   jumpStrength: -12,
 };
 
-// Trail effect
+// Trails
 let playerTrail = [];
-const trailLength = 5;
-
-// Ground (starting platform)
-const ground = {
-  x: 0,
-  y: height - 30,
-  width: width,
-  height: 30,
-};
+const trailSpacing = 10;
+const maxTrailLength = 15;
+let lastTrailAlpha = 1;
 
 // Platforms
 const platforms = [];
@@ -39,106 +45,179 @@ const platformCount = 8;
 // Particles
 const particles = [];
 
-// Score and state
+// Other
+const ground = { x: 0, y: height - 30, width: width, height: 30 };
 let score = 0;
 let gameStarted = false;
 let restarting = false;
 
-// Background music
+// Music and sounds
 const bgMusic = new Audio('music.mp3');
 bgMusic.loop = true;
 bgMusic.volume = 0.3;
-let musicStarted = false;
 
-// Sound effects
+const menuMusic = new Audio('menu_music.mp3');
+menuMusic.loop = true;
+menuMusic.volume = 0.3;
+
 const jumpSound = new Audio('jump.mp3');
 jumpSound.volume = 0.7;
 
 const fallSound = new Audio('fall.mp3');
 fallSound.volume = 0.9;
 
-// Grid variables
 let gridOffsetY = 0;
 const gridSpacing = 50;
 
+// Init
 function initPlatforms() {
   platforms.length = 0;
-  let spacing = height / platformCount;
   for (let i = 0; i < platformCount; i++) {
-    platforms.push(createPlatform(height - 100 - i * spacing));
+    platforms.push(createPlatform(height - 100 - (i * (height / platformCount))));
   }
 }
 
 function createPlatform(y) {
-  return {
-    x: Math.random() * (width - platformWidth),
-    y: y,
-    opacity: 1.0,
-    touches: 0
-  };
+  return { x: Math.random() * (width - platformWidth), y: y, opacity: 1.0, touches: 0 };
 }
 
-initPlatforms();
+// Music control
+function stopAllMusic() {
+  bgMusic.pause();
+  bgMusic.currentTime = 0;
+  menuMusic.pause();
+  menuMusic.currentTime = 0;
+}
 
-// Controls
-let moveLeft = false;
-let moveRight = false;
-
-function handleTouchStart(e) {
-  e.preventDefault();
-  const touchX = e.touches[0].clientX;
-  if (touchX < window.innerWidth / 2) {
-    moveLeft = true;
-  } else {
-    moveRight = true;
+function toggleMusic() {
+  musicOn = !musicOn;
+  stopAllMusic();
+  if (musicOn) {
+    if (currentScreen === 'menu') menuMusic.play();
+    if (currentScreen === 'game') bgMusic.play();
   }
+}
 
-  if (!musicStarted) {
-    bgMusic.play().catch(err => {
-      console.log('Music autoplay blocked:', err);
-    });
-    musicStarted = true;
+// Start / Restart
+function startGame() {
+  currentScreen = 'game';
+  initPlatforms();
+  resetPlayer();
+  stopAllMusic();
+  if (musicOn) bgMusic.play();
+}
+
+function resetPlayer() {
+  player.x = width / 2;
+  player.y = height - 100;
+  player.vy = 0;
+  player.vx = 0;
+  ground.y = height - 30;
+  score = 0;
+  gridOffsetY = 0;
+  playerTrail = [];
+  lastTrailAlpha = 1;
+  particles.length = 0;
+}
+
+function handleGameOver() {
+  restarting = true;
+  stopAllMusic();
+  fallSound.play().catch(err => {});
+  setTimeout(() => {
+    resetPlayer();
+    restarting = false;
+    if (musicOn) bgMusic.play();
+  }, 2000);
+}
+
+// Input handling
+function handleTouchStart(e) {
+  const touchX = e.touches[0].clientX;
+  const touchY = e.touches[0].clientY;
+  if (currentScreen === 'menu') {
+    if (touchX > width/2 - 75 && touchX < width/2 + 75 && touchY > height/2 + 50 && touchY < height/2 + 110) {
+      startGame();
+    }
+    if (touchX > width/2 - 50 && touchX < width/2 + 50 && touchY > height/2 + 130 && touchY < height/2 + 180) {
+      toggleMusic();
+    }
+  } else {
+    if (touchX > width - 90 && touchX < width - 20 && touchY > 20 && touchY < 60) {
+      currentScreen = 'menu';
+      stopAllMusic();
+      if (musicOn) menuMusic.play();
+    }
+    e.preventDefault();
+    if (touchX < width / 2) moveLeft = true;
+    else moveRight = true;
   }
 }
 
 function handleTouchEnd(e) {
-  e.preventDefault();
-  moveLeft = false;
-  moveRight = false;
+  if (currentScreen === 'game') {
+    e.preventDefault();
+    moveLeft = false;
+    moveRight = false;
+  }
+}
+
+function handleMouseDown(e) {
+  const mouseX = e.clientX;
+  const mouseY = e.clientY;
+  if (currentScreen === 'menu') {
+    if (mouseX > width/2 - 75 && mouseX < width/2 + 75 && mouseY > height/2 + 50 && mouseY < height/2 + 110) {
+      startGame();
+    }
+    if (mouseX > width/2 - 50 && mouseX < width/2 + 50 && mouseY > height/2 + 130 && mouseY < height/2 + 180) {
+      toggleMusic();
+    }
+  } else {
+    if (mouseX > width - 90 && mouseX < width - 20 && mouseY > 20 && mouseY < 60) {
+      currentScreen = 'menu';
+      stopAllMusic();
+      if (musicOn) menuMusic.play();
+    }
+  }
 }
 
 window.addEventListener('touchstart', handleTouchStart, { passive: false });
 window.addEventListener('touchend', handleTouchEnd, { passive: false });
-
-// Keyboard controls
+window.addEventListener('mousedown', handleMouseDown);
 window.addEventListener('keydown', (e) => {
-  if (e.code === 'KeyA') moveLeft = true;
-  if (e.code === 'KeyD') moveRight = true;
+  if (currentScreen === 'menu' && e.code === 'Space') {
+    startGame();
+  } else {
+    if (e.code === 'KeyA') moveLeft = true;
+    if (e.code === 'KeyD') moveRight = true;
+    if (e.code === 'Escape') {
+      currentScreen = 'menu';
+      stopAllMusic();
+      if (musicOn) menuMusic.play();
+    }
+  }
 });
-
 window.addEventListener('keyup', (e) => {
   if (e.code === 'KeyA') moveLeft = false;
   if (e.code === 'KeyD') moveRight = false;
 });
 
-// Resize
-window.addEventListener('resize', () => {
-  width = window.innerWidth;
-  height = window.innerHeight;
-  canvas.width = width;
-  canvas.height = height;
-  ground.width = width;
-});
-
-// Update logic
+// Game update
 function update() {
-  if (restarting) return;
+  if (restarting || currentScreen !== 'game') return;
 
-  // Update player trail
-  playerTrail.push({ x: player.x, y: player.y });
-  if (playerTrail.length > trailLength) {
-    playerTrail.shift();
+  frameCounter++;
+  if (frameCounter % trailSpacing === 0) {
+    playerTrail.push({ x: player.x, y: player.y, alpha: lastTrailAlpha, vy: 0.5 });
+    lastTrailAlpha *= 0.5;
+    if (lastTrailAlpha < 0.2) lastTrailAlpha = 1;
+    if (playerTrail.length > maxTrailLength) playerTrail.shift();
   }
+
+  playerTrail.forEach(t => {
+    t.y += t.vy;
+    t.alpha -= 0.02;
+  });
 
   if (moveLeft) player.vx = -5;
   else if (moveRight) player.vx = 5;
@@ -158,8 +237,8 @@ function update() {
     platforms.forEach(p => p.y += dy);
     particles.forEach(pt => pt.y += dy);
     score += dy;
-    gameStarted = true;
     gridOffsetY += dy;
+    gameStarted = true;
   }
 
   for (let i = platforms.length - 1; i >= 0; i--) {
@@ -169,14 +248,10 @@ function update() {
         player.x < p.x + platformWidth &&
         player.y + player.height > p.y &&
         player.y + player.height < p.y + platformHeight) {
-      jumpSound.currentTime = 0;
-      jumpSound.play().catch(err => {
-        console.log('Jump sound error:', err);
-      });
+      jumpSound.play().catch(err => {});
       player.vy = player.jumpStrength;
       p.touches++;
       p.opacity -= 0.1;
-      spawnParticles(p.x + platformWidth / 2, p.y + platformHeight / 2);
       if (p.touches >= 3) platforms.splice(i, 1);
     }
   }
@@ -184,26 +259,14 @@ function update() {
   if (!gameStarted && player.vy > 0 &&
       player.y + player.height > ground.y &&
       player.y + player.height < ground.y + ground.height + 10) {
-    jumpSound.currentTime = 0;
-    jumpSound.play().catch(err => {
-      console.log('Jump sound error:', err);
-    });
+    jumpSound.play().catch(err => {});
     player.vy = player.jumpStrength;
     player.y = ground.y - player.height;
   }
 
-  for (let i = particles.length - 1; i >= 0; i--) {
-    const pt = particles[i];
-    pt.y += pt.vy;
-    pt.alpha -= 0.01;
-    if (pt.alpha <= 0) {
-      particles.splice(i, 1);
-    }
-  }
-
-  while (platforms.length < platformCount || (platforms[platforms.length - 1].y > 0)) {
-    const lastPlatform = platforms.length ? platforms[platforms.length - 1] : { y: height };
-    platforms.push(createPlatform(lastPlatform.y - height / platformCount));
+  while (platforms.length < platformCount || platforms[platforms.length-1].y > 0) {
+    const last = platforms.length ? platforms[platforms.length-1] : { y: height };
+    platforms.push(createPlatform(last.y - height / platformCount));
   }
 
   if (gameStarted && player.y > height && !restarting) {
@@ -211,31 +274,19 @@ function update() {
   }
 }
 
-function spawnParticles(x, y) {
-  for (let i = 0; i < 5; i++) {
-    particles.push({
-      x: x + (Math.random() - 0.5) * 20,
-      y: y,
-      vy: 1 + Math.random() * 2,
-      size: 2 + Math.random() * 2,
-      alpha: 1
-    });
-  }
-}
-
-// Dynamic background color generator
-function getBackgroundColor() {
+// Draw
+function drawBackgroundGradient() {
   const progress = Math.min(score / 10000, 1);
-  const r = Math.floor(0 + 100 * progress);
-  const g = Math.floor(0 + 50 * progress);
-  const b = Math.floor(50 + 200 * (1 - progress));
-  return `rgb(${r},${g},${b})`;
+  const gradient = ctx.createLinearGradient(0, 0, 0, height);
+  gradient.addColorStop(0, `rgb(${50 + 200 * progress}, ${50}, ${150 - 100 * progress})`);
+  gradient.addColorStop(1, `rgb(0,${100 * progress},${50 + 150 * (1 - progress)})`);
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, width, height);
 }
 
-// Draw infinite grid
 function drawGrid() {
   ctx.save();
-  ctx.strokeStyle = 'rgba(0,255,255,0.2)'; // more transparent
+  ctx.strokeStyle = 'rgba(0,255,255,0.15)';
   ctx.lineWidth = 1;
   const offset = gridOffsetY % gridSpacing;
   for (let x = 0; x < width; x += gridSpacing) {
@@ -253,26 +304,43 @@ function drawGrid() {
   ctx.restore();
 }
 
-// Draw all
-function draw() {
-  ctx.fillStyle = getBackgroundColor(); // Dynamic background!
+function drawMenu() {
+  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = 'black';
   ctx.fillRect(0, 0, width, height);
 
-  drawGrid();
+  ctx.drawImage(logoImage, width/2 - 100, height/2 - 150, 200, 100);
 
-  if (ground.y < height) {
-    ctx.fillStyle = 'white';
-    ctx.fillRect(ground.x, ground.y, ground.width, ground.height);
+  ctx.fillStyle = 'white';
+  ctx.fillRect(width/2 - 75, height/2 + 50, 150, 60);
+  ctx.fillStyle = 'black';
+  ctx.font = '30px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('DRIFT', width/2, height/2 + 95);
+
+  ctx.fillStyle = musicOn ? 'lime' : 'red';
+  ctx.fillRect(width/2 - 50, height/2 + 130, 100, 50);
+  ctx.fillStyle = 'black';
+  ctx.font = '20px Arial';
+  ctx.fillText(musicOn ? 'MUSIC ON' : 'MUSIC OFF', width/2, height/2 + 160);
+}
+
+function draw() {
+  if (currentScreen === 'menu') {
+    drawMenu();
+    return;
   }
 
-  playerTrail.forEach((pos, index) => {
-    const reverseIndex = trailLength - index - 1;
-    const scale = 1 - (reverseIndex / trailLength) * 0.6;
-    const alpha = 0.4 + (reverseIndex / trailLength) * 0.5;
-    const trailSize = player.width * scale;
-    const offset = (player.width - trailSize) / 2;
-    ctx.fillStyle = `rgba(255,255,255,${alpha})`;
-    ctx.fillRect(pos.x + offset, pos.y + offset, trailSize, trailSize);
+  drawBackgroundGradient();
+  drawGrid();
+
+  ctx.fillStyle = 'white';
+  ctx.fillRect(ground.x, ground.y, ground.width, ground.height);
+
+  playerTrail.forEach((pos) => {
+    ctx.strokeStyle = `rgba(255,255,255,${pos.alpha})`;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(pos.x, pos.y, player.width, player.height);
   });
 
   ctx.fillStyle = 'cyan';
@@ -283,56 +351,21 @@ function draw() {
     ctx.fillRect(p.x, p.y, platformWidth, platformHeight);
   });
 
-  particles.forEach(pt => {
-    ctx.fillStyle = `rgba(255,255,255,${pt.alpha})`;
-    ctx.fillRect(pt.x, pt.y, pt.size, pt.size);
-  });
-
   ctx.fillStyle = 'yellow';
   ctx.font = '20px Arial';
   ctx.fillText('Score: ' + Math.floor(score / 100), 10, 30);
+
+  ctx.fillStyle = 'white';
+  ctx.fillRect(width - 90, 20, 70, 40);
+  ctx.fillStyle = 'black';
+  ctx.fillText('EXIT', width - 55, 50);
 }
 
-// Game loop
+// Game Loop
 function gameLoop() {
   update();
   draw();
   requestAnimationFrame(gameLoop);
 }
 
-// Handle Game Over
-function handleGameOver() {
-  restarting = true;
-  if (musicStarted) bgMusic.pause();
-  fallSound.currentTime = 0;
-  fallSound.play().catch(err => {
-    console.log('Fall sound error:', err);
-  });
-  setTimeout(() => {
-    restartGame();
-    restarting = false;
-  }, 2000);
-}
-
-function restartGame() {
-  player.x = width / 2;
-  player.y = height - 100;
-  player.vy = 0;
-  player.vx = 0;
-  ground.y = height - 30;
-  score = 0;
-  gridOffsetY = 0;
-  playerTrail = [];
-  particles.length = 0;
-  initPlatforms();
-  gameStarted = false;
-  if (musicStarted) {
-    bgMusic.currentTime = 0;
-    bgMusic.play().catch(err => {
-      console.log('Music play error on restart:', err);
-    });
-  }
-}
-
-// Start the game
 gameLoop();
