@@ -6,7 +6,7 @@ let height = window.innerHeight;
 canvas.width = width;
 canvas.height = height;
 
-// Игрок
+// Player
 const player = {
   x: width / 2,
   y: height - 100,
@@ -18,7 +18,7 @@ const player = {
   jumpStrength: -12,
 };
 
-// Земля (начальная платформа)
+// Ground (starting platform)
 const ground = {
   x: 0,
   y: height - 30,
@@ -26,22 +26,27 @@ const ground = {
   height: 30,
 };
 
-// Платформы
+// Platforms
 const platforms = [];
 const platformWidth = 60;
 const platformHeight = 10;
 const platformCount = 8;
 
-// Счёт
+// Score
 let score = 0;
 let gameStarted = false;
+let restarting = false;
 
-// Музыка
-const bgMusic = new Audio('music.mp3'); // <-- Путь к твоему аудиофайлу
-bgMusic.loop = true; // Зацикливаем музыку
+// Background music
+const bgMusic = new Audio('music.mp3');
+bgMusic.loop = true;
 let musicStarted = false;
 
-// Инициализация платформ
+// Sound effects
+const jumpSound = new Audio('jump.mp3');
+const fallSound = new Audio('fall.mp3');
+
+// Init platforms
 function initPlatforms() {
   platforms.length = 0;
   let spacing = height / platformCount;
@@ -55,7 +60,7 @@ function initPlatforms() {
 
 initPlatforms();
 
-// Управление
+// Controls
 let moveLeft = false;
 let moveRight = false;
 
@@ -68,10 +73,9 @@ function handleTouchStart(e) {
     moveRight = true;
   }
 
-  // Запуск музыки при первом взаимодействии
   if (!musicStarted) {
     bgMusic.play().catch(err => {
-      console.log('Автозапуск звука заблокирован браузером:', err);
+      console.log('Music autoplay blocked:', err);
     });
     musicStarted = true;
   }
@@ -86,7 +90,7 @@ function handleTouchEnd(e) {
 window.addEventListener('touchstart', handleTouchStart, { passive: false });
 window.addEventListener('touchend', handleTouchEnd, { passive: false });
 
-// Обработка изменения размеров окна
+// Resize
 window.addEventListener('resize', () => {
   width = window.innerWidth;
   height = window.innerHeight;
@@ -95,7 +99,7 @@ window.addEventListener('resize', () => {
   ground.width = width;
 });
 
-// Обновление игры
+// Update
 function update() {
   if (moveLeft) player.vx = -5;
   else if (moveRight) player.vx = 5;
@@ -105,11 +109,11 @@ function update() {
   player.y += player.vy;
   player.vy += player.gravity;
 
-  // Зацикливание выхода за края
+  // Wrap edges
   if (player.x < -player.width) player.x = width;
   if (player.x > width) player.x = -player.width;
 
-  // Скроллинг вверх при прыжке
+  // Scroll upwards
   if (player.y < height / 2) {
     const dy = height / 2 - player.y;
     player.y = height / 2;
@@ -119,7 +123,7 @@ function update() {
     gameStarted = true;
   }
 
-  // Столкновение с платформами
+  // Collision with platforms
   platforms.forEach(p => {
     if (player.vy > 0 &&
         player.x + player.width > p.x &&
@@ -127,18 +131,24 @@ function update() {
         player.y + player.height > p.y &&
         player.y + player.height < p.y + platformHeight) {
       player.vy = player.jumpStrength;
+      jumpSound.play().catch(err => {
+        console.log('Jump sound error:', err);
+      });
     }
   });
 
-  // Столкновение с землёй (до старта)
+  // Collision with ground (before leaving)
   if (!gameStarted && player.vy > 0 &&
       player.y + player.height > ground.y &&
       player.y + player.height < ground.y + ground.height + 10) {
     player.vy = player.jumpStrength;
     player.y = ground.y - player.height;
+    jumpSound.play().catch(err => {
+      console.log('Jump sound error:', err);
+    });
   }
 
-  // Удаление старых платформ
+  // Remove old platforms
   for (let i = 0; i < platforms.length; i++) {
     if (platforms[i].y > height) {
       platforms.splice(i, 1);
@@ -150,45 +160,58 @@ function update() {
   }
 
   // Game Over
-  if (gameStarted && player.y > height) {
-    restartGame();
+  if (gameStarted && player.y > height && !restarting) {
+    handleGameOver();
   }
 }
 
-// Отрисовка игры
+// Draw
 function draw() {
   ctx.clearRect(0, 0, width, height);
 
-  // Земля
+  // Ground
   if (ground.y < height) {
     ctx.fillStyle = 'green';
     ctx.fillRect(ground.x, ground.y, ground.width, ground.height);
   }
 
-  // Игрок
+  // Player
   ctx.fillStyle = 'cyan';
   ctx.fillRect(player.x, player.y, player.width, player.height);
 
-  // Платформы
+  // Platforms
   ctx.fillStyle = 'white';
   platforms.forEach(p => {
     ctx.fillRect(p.x, p.y, platformWidth, platformHeight);
   });
 
-  // Счёт
+  // Score
   ctx.fillStyle = 'yellow';
   ctx.font = '20px Arial';
   ctx.fillText('Score: ' + Math.floor(score / 100), 10, 30);
 }
 
-// Главный цикл игры
+// Main game loop
 function gameLoop() {
   update();
   draw();
   requestAnimationFrame(gameLoop);
 }
 
-// Перезапуск игры
+// Handle Game Over
+function handleGameOver() {
+  restarting = true;
+  fallSound.play().catch(err => {
+    console.log('Fall sound error:', err);
+  });
+
+  setTimeout(() => {
+    restartGame();
+    restarting = false;
+  }, 2000); // 2 seconds pause
+}
+
+// Restart game
 function restartGame() {
   player.x = width / 2;
   player.y = height - 100;
@@ -203,12 +226,11 @@ function restartGame() {
 
   gameStarted = false;
 
-  // Останавливаем и перезапускаем музыку при рестарте
   if (musicStarted) {
     bgMusic.pause();
     bgMusic.currentTime = 0;
     bgMusic.play().catch(err => {
-      console.log('Ошибка воспроизведения музыки при рестарте:', err);
+      console.log('Music play error on restart:', err);
     });
   }
 }
