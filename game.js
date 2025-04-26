@@ -61,7 +61,6 @@ fallSound.volume = 0.9;
 let gridOffsetY = 0;
 const gridSpacing = 50;
 
-// Initialize platforms
 function initPlatforms() {
   platforms.length = 0;
   let spacing = height / platformCount;
@@ -111,7 +110,7 @@ function handleTouchEnd(e) {
 window.addEventListener('touchstart', handleTouchStart, { passive: false });
 window.addEventListener('touchend', handleTouchEnd, { passive: false });
 
-// Keyboard controls for PC
+// Keyboard controls
 window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyA') moveLeft = true;
   if (e.code === 'KeyD') moveRight = true;
@@ -149,11 +148,9 @@ function update() {
   player.y += player.vy;
   player.vy += player.gravity;
 
-  // Wrap around edges
   if (player.x < -player.width) player.x = width;
   if (player.x > width) player.x = -player.width;
 
-  // Scroll screen upward
   if (player.y < height / 2) {
     const dy = height / 2 - player.y;
     player.y = height / 2;
@@ -165,7 +162,6 @@ function update() {
     gridOffsetY += dy;
   }
 
-  // Platform collision
   for (let i = platforms.length - 1; i >= 0; i--) {
     const p = platforms[i];
     if (player.vy > 0 &&
@@ -178,22 +174,13 @@ function update() {
         console.log('Jump sound error:', err);
       });
       player.vy = player.jumpStrength;
-
-      // Fade platform
       p.touches++;
       p.opacity -= 0.1;
-
-      // Spawn particles
       spawnParticles(p.x + platformWidth / 2, p.y + platformHeight / 2);
-
-      // Remove platform if too many touches
-      if (p.touches >= 3) {
-        platforms.splice(i, 1);
-      }
+      if (p.touches >= 3) platforms.splice(i, 1);
     }
   }
 
-  // Ground collision at start
   if (!gameStarted && player.vy > 0 &&
       player.y + player.height > ground.y &&
       player.y + player.height < ground.y + ground.height + 10) {
@@ -205,7 +192,6 @@ function update() {
     player.y = ground.y - player.height;
   }
 
-  // Update particles
   for (let i = particles.length - 1; i >= 0; i--) {
     const pt = particles[i];
     pt.y += pt.vy;
@@ -215,13 +201,11 @@ function update() {
     }
   }
 
-  // Generate infinite platforms
   while (platforms.length < platformCount || (platforms[platforms.length - 1].y > 0)) {
     const lastPlatform = platforms.length ? platforms[platforms.length - 1] : { y: height };
     platforms.push(createPlatform(lastPlatform.y - height / platformCount));
   }
 
-  // Game over detection
   if (gameStarted && player.y > height && !restarting) {
     handleGameOver();
   }
@@ -239,14 +223,21 @@ function spawnParticles(x, y) {
   }
 }
 
-// Draw the infinite grid
+// Dynamic background color generator
+function getBackgroundColor() {
+  const progress = Math.min(score / 10000, 1);
+  const r = Math.floor(0 + 100 * progress);
+  const g = Math.floor(0 + 50 * progress);
+  const b = Math.floor(50 + 200 * (1 - progress));
+  return `rgb(${r},${g},${b})`;
+}
+
+// Draw infinite grid
 function drawGrid() {
   ctx.save();
-  ctx.strokeStyle = 'rgba(0,255,255,0.5)';
+  ctx.strokeStyle = 'rgba(0,255,255,0.2)'; // more transparent
   ctx.lineWidth = 1;
-
   const offset = gridOffsetY % gridSpacing;
-
   for (let x = 0; x < width; x += gridSpacing) {
     ctx.beginPath();
     ctx.moveTo(x, -offset);
@@ -259,51 +250,44 @@ function drawGrid() {
     ctx.lineTo(width, y);
     ctx.stroke();
   }
-
   ctx.restore();
 }
 
-// Draw everything
+// Draw all
 function draw() {
-  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = getBackgroundColor(); // Dynamic background!
+  ctx.fillRect(0, 0, width, height);
 
   drawGrid();
 
-  // Ground
   if (ground.y < height) {
     ctx.fillStyle = 'white';
     ctx.fillRect(ground.x, ground.y, ground.width, ground.height);
   }
 
-  // Player trail
   playerTrail.forEach((pos, index) => {
     const reverseIndex = trailLength - index - 1;
     const scale = 1 - (reverseIndex / trailLength) * 0.6;
     const alpha = 0.4 + (reverseIndex / trailLength) * 0.5;
     const trailSize = player.width * scale;
     const offset = (player.width - trailSize) / 2;
-
     ctx.fillStyle = `rgba(255,255,255,${alpha})`;
     ctx.fillRect(pos.x + offset, pos.y + offset, trailSize, trailSize);
   });
 
-  // Player
   ctx.fillStyle = 'cyan';
   ctx.fillRect(player.x, player.y, player.width, player.height);
 
-  // Platforms
   platforms.forEach(p => {
     ctx.fillStyle = `rgba(255,255,255,${p.opacity})`;
     ctx.fillRect(p.x, p.y, platformWidth, platformHeight);
   });
 
-  // Particles
   particles.forEach(pt => {
     ctx.fillStyle = `rgba(255,255,255,${pt.alpha})`;
     ctx.fillRect(pt.x, pt.y, pt.size, pt.size);
   });
 
-  // Score
   ctx.fillStyle = 'yellow';
   ctx.font = '20px Arial';
   ctx.fillText('Score: ' + Math.floor(score / 100), 10, 30);
@@ -316,7 +300,7 @@ function gameLoop() {
   requestAnimationFrame(gameLoop);
 }
 
-// Handle game over
+// Handle Game Over
 function handleGameOver() {
   restarting = true;
   if (musicStarted) bgMusic.pause();
@@ -330,7 +314,6 @@ function handleGameOver() {
   }, 2000);
 }
 
-// Restart
 function restartGame() {
   player.x = width / 2;
   player.y = height - 100;
