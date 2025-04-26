@@ -6,7 +6,7 @@ let height = window.innerHeight;
 canvas.width = width;
 canvas.height = height;
 
-// Player
+// Player settings
 const player = {
   x: width / 2,
   y: height - 100,
@@ -32,7 +32,7 @@ const platformWidth = 60;
 const platformHeight = 10;
 const platformCount = 8;
 
-// Score
+// Score and game state
 let score = 0;
 let gameStarted = false;
 let restarting = false;
@@ -40,13 +40,17 @@ let restarting = false;
 // Background music
 const bgMusic = new Audio('music.mp3');
 bgMusic.loop = true;
+bgMusic.volume = 0.3; // softer background music
 let musicStarted = false;
 
 // Sound effects
 const jumpSound = new Audio('jump.mp3');
-const fallSound = new Audio('fall.mp3');
+jumpSound.volume = 0.7; // louder jump
 
-// Init platforms
+const fallSound = new Audio('fall.mp3');
+fallSound.volume = 0.9;
+
+// Initialize platforms
 function initPlatforms() {
   platforms.length = 0;
   let spacing = height / platformCount;
@@ -73,6 +77,7 @@ function handleTouchStart(e) {
     moveRight = true;
   }
 
+  // Start music on first interaction
   if (!musicStarted) {
     bgMusic.play().catch(err => {
       console.log('Music autoplay blocked:', err);
@@ -99,7 +104,7 @@ window.addEventListener('resize', () => {
   ground.width = width;
 });
 
-// Update
+// Update game logic
 function update() {
   if (moveLeft) player.vx = -5;
   else if (moveRight) player.vx = 5;
@@ -109,11 +114,11 @@ function update() {
   player.y += player.vy;
   player.vy += player.gravity;
 
-  // Wrap edges
+  // Wrap player around screen
   if (player.x < -player.width) player.x = width;
   if (player.x > width) player.x = -player.width;
 
-  // Scroll upwards
+  // Scroll screen upward
   if (player.y < height / 2) {
     const dy = height / 2 - player.y;
     player.y = height / 2;
@@ -130,25 +135,31 @@ function update() {
         player.x < p.x + platformWidth &&
         player.y + player.height > p.y &&
         player.y + player.height < p.y + platformHeight) {
-      player.vy = player.jumpStrength;
+
+      jumpSound.currentTime = 0;
       jumpSound.play().catch(err => {
         console.log('Jump sound error:', err);
       });
+
+      player.vy = player.jumpStrength;
     }
   });
 
-  // Collision with ground (before leaving)
+  // Collision with ground before game really starts
   if (!gameStarted && player.vy > 0 &&
       player.y + player.height > ground.y &&
       player.y + player.height < ground.y + ground.height + 10) {
-    player.vy = player.jumpStrength;
-    player.y = ground.y - player.height;
+
+    jumpSound.currentTime = 0;
     jumpSound.play().catch(err => {
       console.log('Jump sound error:', err);
     });
+
+    player.vy = player.jumpStrength;
+    player.y = ground.y - player.height;
   }
 
-  // Remove old platforms
+  // Remove and add new platforms
   for (let i = 0; i < platforms.length; i++) {
     if (platforms[i].y > height) {
       platforms.splice(i, 1);
@@ -159,39 +170,39 @@ function update() {
     }
   }
 
-  // Game Over
+  // Check for Game Over
   if (gameStarted && player.y > height && !restarting) {
     handleGameOver();
   }
 }
 
-// Draw
+// Drawing game
 function draw() {
   ctx.clearRect(0, 0, width, height);
 
-  // Ground
+  // Draw ground
   if (ground.y < height) {
     ctx.fillStyle = 'green';
     ctx.fillRect(ground.x, ground.y, ground.width, ground.height);
   }
 
-  // Player
+  // Draw player
   ctx.fillStyle = 'cyan';
   ctx.fillRect(player.x, player.y, player.width, player.height);
 
-  // Platforms
+  // Draw platforms
   ctx.fillStyle = 'white';
   platforms.forEach(p => {
     ctx.fillRect(p.x, p.y, platformWidth, platformHeight);
   });
 
-  // Score
+  // Draw score
   ctx.fillStyle = 'yellow';
   ctx.font = '20px Arial';
   ctx.fillText('Score: ' + Math.floor(score / 100), 10, 30);
 }
 
-// Main game loop
+// Game loop
 function gameLoop() {
   update();
   draw();
@@ -201,6 +212,7 @@ function gameLoop() {
 // Handle Game Over
 function handleGameOver() {
   restarting = true;
+  fallSound.currentTime = 0;
   fallSound.play().catch(err => {
     console.log('Fall sound error:', err);
   });
@@ -208,10 +220,10 @@ function handleGameOver() {
   setTimeout(() => {
     restartGame();
     restarting = false;
-  }, 2000); // 2 seconds pause
+  }, 2000); // 2 seconds pause before restarting
 }
 
-// Restart game
+// Restart the game
 function restartGame() {
   player.x = width / 2;
   player.y = height - 100;
@@ -235,4 +247,5 @@ function restartGame() {
   }
 }
 
+// Start the game loop
 gameLoop();
