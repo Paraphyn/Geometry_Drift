@@ -98,6 +98,25 @@ function handleTouchEnd(e) {
 window.addEventListener('touchstart', handleTouchStart, { passive: false });
 window.addEventListener('touchend', handleTouchEnd, { passive: false });
 
+// Keyboard controls for PC
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'KeyA') {
+    moveLeft = true;
+  }
+  if (e.code === 'KeyD') {
+    moveRight = true;
+  }
+});
+
+window.addEventListener('keyup', (e) => {
+  if (e.code === 'KeyA') {
+    moveLeft = false;
+  }
+  if (e.code === 'KeyD') {
+    moveRight = false;
+  }
+});
+
 // Resize
 window.addEventListener('resize', () => {
   width = window.innerWidth;
@@ -211,11 +230,11 @@ function drawGrid() {
   ctx.restore();
 }
 
-// Draw game
+// Draw everything
 function draw() {
   ctx.clearRect(0, 0, width, height);
 
-  drawGrid(); // draw the background grid first
+  drawGrid(); // draw background grid first
 
   // Draw ground
   if (ground.y < height) {
