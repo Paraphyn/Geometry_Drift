@@ -6,19 +6,19 @@ let height = window.innerHeight;
 canvas.width = width;
 canvas.height = height;
 
-// Player settings
+// Игрок
 const player = {
   x: width / 2,
   y: height - 100,
   width: 30,
   height: 30,
-  vy: 0, // vertical speed
+  vy: 0,
   vx: 0,
   gravity: 0.5,
   jumpStrength: -12,
 };
 
-// Ground (starting platform)
+// Земля (начальная платформа)
 const ground = {
   x: 0,
   y: height - 30,
@@ -26,19 +26,19 @@ const ground = {
   height: 30,
 };
 
-// Platform settings
+// Платформы
 const platforms = [];
 const platformWidth = 60;
 const platformHeight = 10;
 const platformCount = 8;
 
-// Score
+// Счёт
 let score = 0;
 let gameStarted = false;
 
-// Init platforms
+// Инициализация платформ
 function initPlatforms() {
-  platforms.length = 0; // clear existing
+  platforms.length = 0;
   let spacing = height / platformCount;
   for (let i = 0; i < platformCount; i++) {
     platforms.push({
@@ -50,33 +50,36 @@ function initPlatforms() {
 
 initPlatforms();
 
-// Input
+// Управление
 let moveLeft = false;
 let moveRight = false;
 
 window.addEventListener('touchstart', (e) => {
+  e.preventDefault();
   const touchX = e.touches[0].clientX;
-  if (touchX < width / 2) {
+  if (touchX < window.innerWidth / 2) {
     moveLeft = true;
   } else {
     moveRight = true;
   }
-});
+}, { passive: false });
 
-window.addEventListener('touchend', () => {
+window.addEventListener('touchend', (e) => {
+  e.preventDefault();
   moveLeft = false;
   moveRight = false;
-});
+}, { passive: false });
 
-// Resize
+// Обработка изменения размеров окна
 window.addEventListener('resize', () => {
   width = window.innerWidth;
   height = window.innerHeight;
   canvas.width = width;
   canvas.height = height;
+  ground.width = width;
 });
 
-// Main game loop
+// Обновление игры
 function update() {
   if (moveLeft) player.vx = -5;
   else if (moveRight) player.vx = 5;
@@ -86,21 +89,21 @@ function update() {
   player.y += player.vy;
   player.vy += player.gravity;
 
-  // Wrap around edges
+  // Зацикливание выхода за края
   if (player.x < -player.width) player.x = width;
   if (player.x > width) player.x = -player.width;
 
-  // Scroll screen upward
+  // Скроллинг вверх при прыжке
   if (player.y < height / 2) {
-    let dy = height / 2 - player.y;
+    const dy = height / 2 - player.y;
     player.y = height / 2;
     ground.y += dy;
     platforms.forEach(p => p.y += dy);
     score += dy;
-    gameStarted = true; // Player has left the ground
+    gameStarted = true;
   }
 
-  // Platform collision
+  // Столкновение с платформами
   platforms.forEach(p => {
     if (player.vy > 0 &&
         player.x + player.width > p.x &&
@@ -111,80 +114,77 @@ function update() {
     }
   });
 
-  // Ground collision
+  // Столкновение с землёй (до старта)
   if (!gameStarted && player.vy > 0 &&
       player.y + player.height > ground.y &&
       player.y + player.height < ground.y + ground.height + 10) {
     player.vy = player.jumpStrength;
-    player.y = ground.y - player.height; // Stick on top
+    player.y = ground.y - player.height;
   }
 
-  // Remove and add new platforms
+  // Удаление старых платформ
   for (let i = 0; i < platforms.length; i++) {
     if (platforms[i].y > height) {
       platforms.splice(i, 1);
       platforms.push({
         x: Math.random() * (width - platformWidth),
-        y: platforms[platforms.length-1].y - height / platformCount
+        y: platforms[platforms.length - 1].y - height / platformCount
       });
     }
   }
 
-  // Game Over condition (only if left the ground)
+  // Game Over
   if (gameStarted && player.y > height) {
     restartGame();
   }
 }
 
+// Отрисовка игры
 function draw() {
   ctx.clearRect(0, 0, width, height);
 
-  // Draw ground
+  // Земля
   if (ground.y < height) {
     ctx.fillStyle = 'green';
     ctx.fillRect(ground.x, ground.y, ground.width, ground.height);
   }
 
-  // Draw player
+  // Игрок
   ctx.fillStyle = 'cyan';
   ctx.fillRect(player.x, player.y, player.width, player.height);
 
-  // Draw platforms
+  // Платформы
   ctx.fillStyle = 'white';
   platforms.forEach(p => {
     ctx.fillRect(p.x, p.y, platformWidth, platformHeight);
   });
 
-  // Draw score
+  // Счёт
   ctx.fillStyle = 'yellow';
   ctx.font = '20px Arial';
   ctx.fillText('Score: ' + Math.floor(score / 100), 10, 30);
 }
 
+// Главный цикл игры
 function gameLoop() {
   update();
   draw();
   requestAnimationFrame(gameLoop);
 }
 
-// Restart logic
+// Перезапуск игры
 function restartGame() {
-  // Reset player
   player.x = width / 2;
   player.y = height - 100;
   player.vy = 0;
   player.vx = 0;
 
-  // Reset ground
   ground.y = height - 30;
 
-  // Reset score
   score = 0;
 
-  // Reset platforms
   initPlatforms();
 
-  // Reset game state
   gameStarted = false;
 }
 
