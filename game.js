@@ -133,7 +133,7 @@ window.addEventListener('resize', () => {
 
 // Update logic
 function update() {
-  if (restarting) return; // Freeze update during restart pause
+  if (restarting) return;
 
   // Update player trail
   playerTrail.push({ x: player.x, y: player.y });
@@ -215,10 +215,10 @@ function update() {
     }
   }
 
-  // Recycle platforms
-  while (platforms.length < platformCount) {
-    const lastY = platforms.length ? platforms[platforms.length - 1].y : height;
-    platforms.push(createPlatform(lastY - height / platformCount));
+  // Generate infinite platforms
+  while (platforms.length < platformCount || (platforms[platforms.length - 1].y > 0)) {
+    const lastPlatform = platforms.length ? platforms[platforms.length - 1] : { y: height };
+    platforms.push(createPlatform(lastPlatform.y - height / platformCount));
   }
 
   // Game over detection
