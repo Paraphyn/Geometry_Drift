@@ -12,6 +12,7 @@ logoImage.src = 'logo.png'; // Replace with your logo file
 
 // States
 let currentScreen = 'menu'; // 'menu' or 'game'
+let lobbyGlowPhase = 0;
 
 // Player settings
 const player = {
@@ -451,6 +452,16 @@ function drawMenu() {
   ctx.clearRect(0, 0, width, height);
   ctx.fillStyle = 'black';
   ctx.fillRect(0, 0, width, height);
+
+  lobbyGlowPhase += 0.02;
+  const pulse = (Math.sin(lobbyGlowPhase) + 1) / 2;
+  const glowHeight = Math.min(height * 0.3, 200);
+  const glowAlpha = 0.25 + 0.25 * pulse;
+  const glowGradient = ctx.createLinearGradient(0, height - glowHeight, 0, height);
+  glowGradient.addColorStop(0, 'rgba(255, 60, 60, 0)');
+  glowGradient.addColorStop(1, `rgba(255, 40, 40, ${glowAlpha.toFixed(3)})`);
+  ctx.fillStyle = glowGradient;
+  ctx.fillRect(0, height - glowHeight, width, glowHeight);
 
   ctx.drawImage(logoImage, width/2 - 100, height/2 - 150, 200, 100);
 
