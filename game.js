@@ -23,7 +23,98 @@ const player = {
   vx: 0,
   gravity: 0.5,
   jumpStrength: -12,
+  damageTimer: 0,
 };
+
+const PLAYER_THEMES = {
+  neonFrame: {
+    label: 'Neon Frame',
+    shape: 'roundedRect',
+    radius: 8,
+    baseFill: '#00f5ff',
+    baseStroke: '#ffffff',
+    glow: 'rgba(0,245,255,0.65)',
+    shadowBlur: 18,
+    damagedFill: '#ff5c8d',
+    damagedStroke: '#ffe066',
+    damageGlow: 'rgba(255,92,141,0.75)',
+    damageShadowBlur: 26,
+    strokeWidth: 2,
+  },
+  auroraDiamond: {
+    label: 'Aurora Diamond',
+    shape: 'diamond',
+    baseFill: '#9d4edd',
+    baseStroke: '#e0aaff',
+    glow: 'rgba(224,170,255,0.55)',
+    shadowBlur: 16,
+    damagedFill: '#ff6b6b',
+    damagedStroke: '#ffe66d',
+    damageGlow: 'rgba(255,107,107,0.65)',
+    damageShadowBlur: 24,
+    strokeWidth: 2,
+  },
+  pulseOrb: {
+    label: 'Pulse Orb',
+    shape: 'circle',
+    baseFill: '#00c6ff',
+    baseStroke: '#f0f0f0',
+    glow: 'rgba(0,198,255,0.65)',
+    shadowBlur: 20,
+    damagedFill: '#ff4b1f',
+    damagedStroke: '#ffd152',
+    damageGlow: 'rgba(255,75,31,0.7)',
+    damageShadowBlur: 28,
+    strokeWidth: 2,
+  },
+};
+
+const THEME_KEYS = Object.keys(PLAYER_THEMES);
+const DEFAULT_THEME_KEY = THEME_KEYS[0];
+
+function readStoredThemeKey() {
+  if (typeof window === 'undefined' || typeof window.localStorage === 'undefined') {
+    return DEFAULT_THEME_KEY;
+  }
+  try {
+    const stored = window.localStorage.getItem('drift-player-theme');
+    if (stored && PLAYER_THEMES[stored]) return stored;
+  } catch (err) {
+    // ignore
+  }
+  return DEFAULT_THEME_KEY;
+}
+
+function persistThemeKey(key) {
+  if (typeof window === 'undefined' || typeof window.localStorage === 'undefined') return;
+  try {
+    window.localStorage.setItem('drift-player-theme', key);
+  } catch (err) {
+    // ignore
+  }
+}
+
+let selectedThemeKey = readStoredThemeKey();
+
+function setTheme(key) {
+  if (!PLAYER_THEMES[key]) return;
+  selectedThemeKey = key;
+  persistThemeKey(key);
+}
+
+function cycleTheme(step = 1) {
+  if (!THEME_KEYS.length) return;
+  const idx = THEME_KEYS.indexOf(selectedThemeKey);
+  const safeIdx = idx === -1 ? 0 : idx;
+  const nextIdx = (safeIdx + step + THEME_KEYS.length) % THEME_KEYS.length;
+  setTheme(THEME_KEYS[nextIdx]);
+}
+
+function getCurrentTheme() {
+  return PLAYER_THEMES[selectedThemeKey] || PLAYER_THEMES[DEFAULT_THEME_KEY];
+}
+
+const DAMAGE_DURATION = 90;
 
 // Trail effect
 let playerTrail = [];
@@ -141,6 +232,7 @@ function resetPlayer() {
   playerTrail = [];
   lastTrailAlpha = 1;
   particles.length = 0;
+  player.damageTimer = 0;
 }
 
 window.addEventListener('touchstart', handleTouchStart, { passive: false });
@@ -154,6 +246,8 @@ window.addEventListener('keydown', (e) => {
     if (e.code === 'KeyD') moveRight = true;
     if (e.code === 'Escape') currentScreen = 'menu';
   }
+  if (e.code === 'KeyQ') cycleTheme(-1);
+  if (e.code === 'KeyE') cycleTheme(1);
 });
 window.addEventListener('keyup', (e) => {
   if (e.code === 'KeyA') moveLeft = false;
@@ -165,6 +259,10 @@ let moveRight = false;
 
 function update() {
   if (restarting || currentScreen !== 'game') return;
+
+  if (player.damageTimer > 0) {
+    player.damageTimer--;
+  }
 
   frameCounter++;
   if (frameCounter % trailSpacing === 0) {
@@ -258,6 +356,68 @@ function spawnParticles(x, y) {
   }
 }
 
+function triggerPlayerDamage(duration = DAMAGE_DURATION) {
+  player.damageTimer = Math.max(player.damageTimer, duration);
+}
+
+function drawPlayerSprite({ x, y, width, height, alpha = 1, isDamaged = false, isTrail = false }) {
+  const theme = getCurrentTheme();
+  const radius = theme.radius ?? 6;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+
+  if (!isTrail) {
+    ctx.shadowColor = isDamaged ? theme.damageGlow : theme.glow;
+    const blur = isDamaged ? (theme.damageShadowBlur ?? 24) : (theme.shadowBlur ?? 16);
+    ctx.shadowBlur = blur;
+  } else {
+    ctx.shadowBlur = 0;
+  }
+
+  ctx.fillStyle = isDamaged ? theme.damagedFill : theme.baseFill;
+  ctx.strokeStyle = isDamaged ? theme.damagedStroke : theme.baseStroke;
+  ctx.lineWidth = theme.strokeWidth ?? 2;
+
+  ctx.beginPath();
+  buildPlayerShapePath(theme.shape, x, y, width, height, radius);
+  ctx.closePath();
+  ctx.fill();
+  if (ctx.lineWidth > 0) {
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+function buildPlayerShapePath(shape, x, y, width, height, radius = 0) {
+  switch (shape) {
+    case 'diamond':
+      ctx.moveTo(x + width / 2, y);
+      ctx.lineTo(x + width, y + height / 2);
+      ctx.lineTo(x + width / 2, y + height);
+      ctx.lineTo(x, y + height / 2);
+      break;
+    case 'circle':
+      ctx.ellipse(x + width / 2, y + height / 2, width / 2, height / 2, 0, 0, Math.PI * 2);
+      break;
+    default:
+      drawRoundedRectPath(x, y, width, height, radius);
+  }
+}
+
+function drawRoundedRectPath(x, y, width, height, radius) {
+  const r = Math.min(Math.max(radius, 0), width / 2, height / 2);
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + width - r, y);
+  ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+  ctx.lineTo(x + width, y + height - r);
+  ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+  ctx.lineTo(x + r, y + height);
+  ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+}
+
 function drawBackgroundGradient() {
   const progress = Math.min(score / 10000, 1);
   const gradient = ctx.createLinearGradient(0, 0, 0, height);
@@ -300,6 +460,13 @@ function drawMenu() {
   ctx.font = '30px Arial';
   ctx.textAlign = 'center';
   ctx.fillText('DRIFT', width/2, height/2 + 95);
+
+  const theme = getCurrentTheme();
+  ctx.fillStyle = '#0ff';
+  ctx.font = '20px Arial';
+  ctx.fillText(`Theme: ${theme.label}`, width / 2, height / 2 + 150);
+  ctx.font = '16px Arial';
+  ctx.fillText('Press Q/E to change theme', width / 2, height / 2 + 175);
 }
 
 function draw() {
@@ -317,13 +484,25 @@ function draw() {
   }
 
   playerTrail.forEach((pos) => {
-    ctx.strokeStyle = `rgba(255,255,255,${pos.alpha})`;
-    ctx.lineWidth = 2;
-    ctx.strokeRect(pos.x, pos.y, player.width, player.height);
+    if (pos.alpha <= 0) return;
+    drawPlayerSprite({
+      x: pos.x,
+      y: pos.y,
+      width: player.width,
+      height: player.height,
+      alpha: Math.max(0, Math.min(1, pos.alpha)),
+      isDamaged: player.damageTimer > 0,
+      isTrail: true,
+    });
   });
 
-  ctx.fillStyle = 'cyan';
-  ctx.fillRect(player.x, player.y, player.width, player.height);
+  drawPlayerSprite({
+    x: player.x,
+    y: player.y,
+    width: player.width,
+    height: player.height,
+    isDamaged: player.damageTimer > 0,
+  });
 
   platforms.forEach(p => {
     if (p.touches === 0) ctx.fillStyle = `rgba(255,255,255,${p.opacity})`;
@@ -337,13 +516,19 @@ function draw() {
     ctx.fillRect(pt.x, pt.y, pt.size, pt.size);
   });
 
+  ctx.textAlign = 'left';
   ctx.fillStyle = 'yellow';
   ctx.font = '20px Arial';
   ctx.fillText('Score: ' + Math.floor(score / 100), 10, 30);
 
+  ctx.fillStyle = '#aef';
+  ctx.font = '14px Arial';
+  ctx.fillText(`Theme: ${getCurrentTheme().label}  [Q/E]`, 10, 55);
+
   ctx.fillStyle = 'white';
   ctx.fillRect(width - 90, 20, 70, 40);
   ctx.fillStyle = 'black';
+  ctx.textAlign = 'center';
   ctx.fillText('EXIT', width - 55, 50);
 }
 
@@ -355,6 +540,7 @@ function gameLoop() {
 
 function handleGameOver() {
   restarting = true;
+  triggerPlayerDamage(DAMAGE_DURATION);
   if (musicStarted) bgMusic.pause();
   fallSound.currentTime = 0;
   fallSound.play().catch(err => {});
