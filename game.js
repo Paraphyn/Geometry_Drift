@@ -158,10 +158,6 @@ jumpSound.volume = 0.7;
 const fallSound = new Audio('fall.mp3');
 fallSound.volume = 0.9;
 
-// Grid
-let gridOffsetY = 0;
-const gridSpacing = 50;
-
 function initPlatforms() {
   platforms.length = 0;
   let spacing = height / platformCount;
@@ -229,7 +225,6 @@ function resetPlayer() {
   player.vx = 0;
   ground.y = height - 30;
   score = 0;
-  gridOffsetY = 0;
   playerTrail = [];
   lastTrailAlpha = 1;
   particles.length = 0;
@@ -299,7 +294,6 @@ function update() {
     particles.forEach(pt => pt.y += dy);
     score += dy;
     gameStarted = true;
-    gridOffsetY += dy;
   }
 
   for (let i = platforms.length - 1; i >= 0; i--) {
@@ -428,26 +422,6 @@ function drawBackgroundGradient() {
   ctx.fillRect(0, 0, width, height);
 }
 
-function drawGrid() {
-  ctx.save();
-  ctx.strokeStyle = 'rgba(0,255,255,0.15)';
-  ctx.lineWidth = 1;
-  const offset = gridOffsetY % gridSpacing;
-  for (let x = 0; x < width; x += gridSpacing) {
-    ctx.beginPath();
-    ctx.moveTo(x, -offset);
-    ctx.lineTo(x, height);
-    ctx.stroke();
-  }
-  for (let y = -offset; y < height; y += gridSpacing) {
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(width, y);
-    ctx.stroke();
-  }
-  ctx.restore();
-}
-
 function drawMenu() {
   ctx.clearRect(0, 0, width, height);
   ctx.fillStyle = 'black';
@@ -487,8 +461,6 @@ function draw() {
   }
 
   drawBackgroundGradient();
-  drawGrid();
-
   if (ground.y < height) {
     ctx.fillStyle = 'white';
     ctx.fillRect(ground.x, ground.y, ground.width, ground.height);
