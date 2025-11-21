@@ -145,6 +145,7 @@ const particles = [];
 let score = 0;
 let gameStarted = false;
 let restarting = false;
+let lastScore = 0;
 
 // Music & sounds
 const bgMusic = new Audio('music.mp3');
@@ -158,9 +159,70 @@ jumpSound.volume = 0.7;
 const fallSound = new Audio('fall.mp3');
 fallSound.volume = 0.9;
 
+const gameOverMusic = new Audio('menu_music.mp3');
+gameOverMusic.loop = true;
+gameOverMusic.volume = 0;
+const GAME_OVER_MUSIC_DELAY = 2000;
+const GAME_OVER_MUSIC_TARGET_VOLUME = 0.45;
+const GAME_OVER_MUSIC_FADE_DURATION = 3000;
+let gameOverMusicTimeout = null;
+let gameOverMusicFadeInterval = null;
+
 // Grid
 let gridOffsetY = 0;
 const gridSpacing = 50;
+
+function clearGameOverMusicTimers() {
+  if (gameOverMusicTimeout) {
+    clearTimeout(gameOverMusicTimeout);
+    gameOverMusicTimeout = null;
+  }
+  if (gameOverMusicFadeInterval) {
+    clearInterval(gameOverMusicFadeInterval);
+    gameOverMusicFadeInterval = null;
+  }
+}
+
+function fadeInGameOverMusic() {
+  clearInterval(gameOverMusicFadeInterval);
+  const steps = 20;
+  const stepDuration = GAME_OVER_MUSIC_FADE_DURATION / steps;
+  const volumeIncrement = GAME_OVER_MUSIC_TARGET_VOLUME / steps;
+  let currentStep = 0;
+
+  gameOverMusicFadeInterval = setInterval(() => {
+    currentStep++;
+    const nextVolume = Math.min(
+      GAME_OVER_MUSIC_TARGET_VOLUME,
+      gameOverMusic.volume + volumeIncrement
+    );
+    gameOverMusic.volume = nextVolume;
+    if (currentStep >= steps || nextVolume >= GAME_OVER_MUSIC_TARGET_VOLUME) {
+      clearInterval(gameOverMusicFadeInterval);
+      gameOverMusicFadeInterval = null;
+      gameOverMusic.volume = GAME_OVER_MUSIC_TARGET_VOLUME;
+    }
+  }, stepDuration);
+}
+
+function scheduleGameOverMusic() {
+  clearGameOverMusicTimers();
+  gameOverMusic.volume = 0;
+  gameOverMusic.currentTime = 0;
+  gameOverMusicTimeout = setTimeout(() => {
+    gameOverMusic
+      .play()
+      .then(() => fadeInGameOverMusic())
+      .catch(() => {});
+  }, GAME_OVER_MUSIC_DELAY);
+}
+
+function stopGameOverMusic() {
+  clearGameOverMusicTimers();
+  gameOverMusic.pause();
+  gameOverMusic.currentTime = 0;
+  gameOverMusic.volume = 0;
+}
 
 function initPlatforms() {
   platforms.length = 0;
@@ -186,6 +248,11 @@ function handleTouchStart(e) {
     if (touchX > width/2 - 75 && touchX < width/2 + 75 && touchY > height/2 + 50 && touchY < height/2 + 110) {
       startGame();
     }
+  } else if (currentScreen === 'gameOver') {
+    e.preventDefault();
+    const touchX = e.touches[0].clientX;
+    const touchY = e.touches[0].clientY;
+    handleGameOverPointer(touchX, touchY);
   } else {
     e.preventDefault();
     const touchX = e.touches[0].clientX;
@@ -205,6 +272,8 @@ function handleMouseDown(e) {
     if (mouseX > width/2 - 75 && mouseX < width/2 + 75 && mouseY > height/2 + 50 && mouseY < height/2 + 110) {
       startGame();
     }
+  } else if (currentScreen === 'gameOver') {
+    handleGameOverPointer(e.clientX, e.clientY);
   }
 }
 
@@ -217,9 +286,17 @@ function handleTouchEnd(e) {
 }
 
 function startGame() {
+  restartGame();
+}
+
+function beginRun() {
   currentScreen = 'game';
   initPlatforms();
   resetPlayer();
+  gameStarted = false;
+  restarting = false;
+  moveLeft = false;
+  moveRight = false;
 }
 
 function resetPlayer() {
@@ -241,11 +318,14 @@ window.addEventListener('touchend', handleTouchEnd, { passive: false });
 window.addEventListener('mousedown', handleMouseDown);
 window.addEventListener('keydown', (e) => {
   if (currentScreen === 'menu') {
-    if (e.code === 'Space') startGame();
+    if (e.code === 'Space' || e.code === 'Enter') startGame();
+  } else if (currentScreen === 'gameOver') {
+    if (e.code === 'Space' || e.code === 'Enter') restartGame();
+    if (e.code === 'Escape') returnToLobby();
   } else {
     if (e.code === 'KeyA') moveLeft = true;
     if (e.code === 'KeyD') moveRight = true;
-    if (e.code === 'Escape') currentScreen = 'menu';
+    if (e.code === 'Escape') returnToLobby();
   }
   if (e.code === 'KeyQ') cycleTheme(-1);
   if (e.code === 'KeyE') cycleTheme(1);
@@ -257,6 +337,10 @@ window.addEventListener('keyup', (e) => {
 
 let moveLeft = false;
 let moveRight = false;
+const gameOverButtons = {
+  restart: { x: 0, y: 0, width: 0, height: 0 },
+  lobby: { x: 0, y: 0, width: 0, height: 0 },
+};
 
 function update() {
   if (restarting || currentScreen !== 'game') return;
@@ -480,9 +564,72 @@ function drawMenu() {
   ctx.fillText('Press Q/E to change theme', width / 2, height / 2 + 175);
 }
 
+function layoutGameOverButtons() {
+  const buttonWidth = Math.min(240, width * 0.5);
+  const buttonHeight = 60;
+  const spacing = 25;
+  const startY = height / 2 - 10;
+  const buttonX = width / 2 - buttonWidth / 2;
+  gameOverButtons.restart = { x: buttonX, y: startY, width: buttonWidth, height: buttonHeight };
+  gameOverButtons.lobby = {
+    x: buttonX,
+    y: startY + buttonHeight + spacing,
+    width: buttonWidth,
+    height: buttonHeight,
+  };
+}
+
+function drawGameOverButton(rect, label) {
+  ctx.fillStyle = 'white';
+  ctx.globalAlpha = 0.9;
+  ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = '#111';
+  ctx.lineWidth = 3;
+  ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
+  ctx.fillStyle = '#111';
+  ctx.font = '24px Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, rect.x + rect.width / 2, rect.y + rect.height / 2);
+}
+
+function drawGameOverScreen() {
+  ctx.clearRect(0, 0, width, height);
+  drawBackgroundGradient();
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#fff';
+  ctx.font = '50px Arial';
+  ctx.fillText('GAME OVER', width / 2, height / 2 - 140);
+
+  ctx.font = '28px Arial';
+  ctx.fillStyle = '#aef';
+  ctx.fillText(`Score: ${lastScore}`, width / 2, height / 2 - 90);
+
+  layoutGameOverButtons();
+  drawGameOverButton(gameOverButtons.restart, 'RESTART');
+  drawGameOverButton(gameOverButtons.lobby, 'LOBBY');
+
+  ctx.font = '18px Arial';
+  ctx.fillStyle = '#ddd';
+  ctx.fillText(
+    'Press ENTER to restart or ESC to return to lobby',
+    width / 2,
+    gameOverButtons.lobby.y + gameOverButtons.lobby.height + 50
+  );
+}
+
 function draw() {
   if (currentScreen === 'menu') {
     drawMenu();
+    return;
+  }
+
+  if (currentScreen === 'gameOver') {
+    drawGameOverScreen();
     return;
   }
 
@@ -543,6 +690,24 @@ function draw() {
   ctx.fillText('EXIT', width - 55, 50);
 }
 
+function pointInRect(px, py, rect) {
+  return (
+    px >= rect.x &&
+    px <= rect.x + rect.width &&
+    py >= rect.y &&
+    py <= rect.y + rect.height
+  );
+}
+
+function handleGameOverPointer(x, y) {
+  layoutGameOverButtons();
+  if (pointInRect(x, y, gameOverButtons.restart)) {
+    restartGame();
+  } else if (pointInRect(x, y, gameOverButtons.lobby)) {
+    returnToLobby();
+  }
+}
+
 function gameLoop() {
   update();
   draw();
@@ -550,23 +715,40 @@ function gameLoop() {
 }
 
 function handleGameOver() {
+  if (restarting) return;
   restarting = true;
   triggerPlayerDamage(DAMAGE_DURATION);
+  moveLeft = false;
+  moveRight = false;
+  gameStarted = false;
+  lastScore = Math.max(0, Math.floor(score / 100));
   if (musicStarted) bgMusic.pause();
   fallSound.currentTime = 0;
   fallSound.play().catch(err => {});
-  setTimeout(() => {
-    restartGame();
-    restarting = false;
-  }, 2000);
+  currentScreen = 'gameOver';
+  scheduleGameOverMusic();
 }
 
 function restartGame() {
-  resetPlayer();
-  gameStarted = false;
+  stopGameOverMusic();
+  beginRun();
   if (musicStarted) {
     bgMusic.currentTime = 0;
-    bgMusic.play().catch(err => {});
+    bgMusic.play().catch(() => {});
+  }
+}
+
+function returnToLobby() {
+  stopGameOverMusic();
+  currentScreen = 'menu';
+  restarting = false;
+  gameStarted = false;
+  moveLeft = false;
+  moveRight = false;
+  resetPlayer();
+  if (musicStarted) {
+    bgMusic.pause();
+    bgMusic.currentTime = 0;
   }
 }
 
