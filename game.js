@@ -448,6 +448,10 @@ function triggerPlayerDamage(duration = DAMAGE_DURATION) {
 function drawPlayerSprite({ x, y, width, height, alpha = 1, isDamaged = false, isTrail = false }) {
   const theme = getCurrentTheme();
   const radius = theme.radius ?? 6;
+  const themeStrokeWidth = Math.max(theme.strokeWidth ?? 2, 0);
+  const outlineWidth = Math.max(themeStrokeWidth + 4, 4);
+  const shapePath = buildPlayerShapePath(theme.shape, x, y, width, height, radius);
+
   ctx.save();
   ctx.globalAlpha = alpha;
 
@@ -460,47 +464,56 @@ function drawPlayerSprite({ x, y, width, height, alpha = 1, isDamaged = false, i
   }
 
   ctx.fillStyle = isDamaged ? theme.damagedFill : theme.baseFill;
-  ctx.strokeStyle = isDamaged ? theme.damagedStroke : theme.baseStroke;
-  ctx.lineWidth = theme.strokeWidth ?? 2;
+  ctx.fill(shapePath);
 
-  ctx.beginPath();
-  buildPlayerShapePath(theme.shape, x, y, width, height, radius);
-  ctx.closePath();
-  ctx.fill();
-  if (ctx.lineWidth > 0) {
-    ctx.stroke();
+  if (!isTrail) {
+    ctx.save();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = outlineWidth;
+    ctx.stroke(shapePath);
+    ctx.restore();
+  }
+
+  if (themeStrokeWidth > 0) {
+    ctx.strokeStyle = isDamaged ? theme.damagedStroke : theme.baseStroke;
+    ctx.lineWidth = themeStrokeWidth;
+    ctx.stroke(shapePath);
   }
 
   ctx.restore();
 }
 
 function buildPlayerShapePath(shape, x, y, width, height, radius = 0) {
+  const path = new Path2D();
   switch (shape) {
     case 'diamond':
-      ctx.moveTo(x + width / 2, y);
-      ctx.lineTo(x + width, y + height / 2);
-      ctx.lineTo(x + width / 2, y + height);
-      ctx.lineTo(x, y + height / 2);
+      path.moveTo(x + width / 2, y);
+      path.lineTo(x + width, y + height / 2);
+      path.lineTo(x + width / 2, y + height);
+      path.lineTo(x, y + height / 2);
       break;
     case 'circle':
-      ctx.ellipse(x + width / 2, y + height / 2, width / 2, height / 2, 0, 0, Math.PI * 2);
+      path.ellipse(x + width / 2, y + height / 2, width / 2, height / 2, 0, 0, Math.PI * 2);
       break;
     default:
-      drawRoundedRectPath(x, y, width, height, radius);
+      drawRoundedRectPath(path, x, y, width, height, radius);
   }
+  path.closePath();
+  return path;
 }
 
-function drawRoundedRectPath(x, y, width, height, radius) {
+function drawRoundedRectPath(path, x, y, width, height, radius) {
   const r = Math.min(Math.max(radius, 0), width / 2, height / 2);
-  ctx.moveTo(x + r, y);
-  ctx.lineTo(x + width - r, y);
-  ctx.quadraticCurveTo(x + width, y, x + width, y + r);
-  ctx.lineTo(x + width, y + height - r);
-  ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
-  ctx.lineTo(x + r, y + height);
-  ctx.quadraticCurveTo(x, y + height, x, y + height - r);
-  ctx.lineTo(x, y + r);
-  ctx.quadraticCurveTo(x, y, x + r, y);
+  path.moveTo(x + r, y);
+  path.lineTo(x + width - r, y);
+  path.quadraticCurveTo(x + width, y, x + width, y + r);
+  path.lineTo(x + width, y + height - r);
+  path.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+  path.lineTo(x + r, y + height);
+  path.quadraticCurveTo(x, y + height, x, y + height - r);
+  path.lineTo(x, y + r);
+  path.quadraticCurveTo(x, y, x + r, y);
 }
 
 function drawBackgroundGradient() {
