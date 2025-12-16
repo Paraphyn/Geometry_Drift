@@ -26,14 +26,55 @@ export function createScene(canvas) {
   const camera = new THREE.PerspectiveCamera(75, 1, 0.05, 300);
   camera.position.set(0, 0, 0);
 
-  // Ship indicator (attached to camera so it's always centered)
-  const ship = new THREE.Mesh(
-    new THREE.ConeGeometry(0.05, 0.18, 12),
-    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.75 }),
+  // Center indicator: white circle + soft glow (attached to camera so it's always centered)
+  const glowTex = (() => {
+    const size = 256;
+    const cnv = document.createElement('canvas');
+    cnv.width = size;
+    cnv.height = size;
+    const ctx = cnv.getContext('2d');
+    if (!ctx) return null;
+
+    const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    g.addColorStop(0.0, 'rgba(255,255,255,1.0)');
+    g.addColorStop(0.18, 'rgba(255,255,255,0.95)');
+    g.addColorStop(0.45, 'rgba(255,255,255,0.35)');
+    g.addColorStop(1.0, 'rgba(255,255,255,0.0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+
+    const t = new THREE.CanvasTexture(cnv);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.minFilter = THREE.LinearFilter;
+    t.magFilter = THREE.LinearFilter;
+    t.needsUpdate = true;
+    return t;
+  })();
+
+  const indicator = new THREE.Group();
+  indicator.position.set(0, -0.05, -0.9);
+
+  const circle = new THREE.Mesh(
+    new THREE.CircleGeometry(0.06, 48),
+    new THREE.MeshBasicMaterial({ color: 0xffffff }),
   );
-  ship.rotation.x = Math.PI * 0.5;
-  ship.position.set(0, -0.05, -0.9);
-  camera.add(ship);
+  circle.renderOrder = 2;
+
+  const halo = new THREE.Mesh(
+    new THREE.CircleGeometry(0.16, 64),
+    new THREE.MeshBasicMaterial({
+      map: glowTex || null,
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.95,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    }),
+  );
+  halo.renderOrder = 1;
+
+  indicator.add(halo, circle);
+  camera.add(indicator);
   scene.add(camera);
 
   // Starfield
