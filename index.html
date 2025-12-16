@@ -9,36 +9,55 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="format-detection" content="telephone=no" />
-    <title>Infinite 3D Space (iPhone)</title>
+    <title>Space Gyro (Mobile)</title>
   </head>
   <body>
     <div id="app">
-      <canvas id="c"></canvas>
+      <canvas id="c" aria-label="3D space scene"></canvas>
 
-      <div id="hud" aria-live="polite">
-        <div class="hud-card">
-          <div class="hud-row">
-            <span class="hud-k">Speed</span>
-            <span class="hud-v" id="hudSpeed">0.0</span>
+      <div id="overlay" class="overlay" aria-live="polite">
+        <div class="panel">
+          <div class="panel-title">Space Gyro</div>
+
+          <div class="row">
+            <button id="btnEnableMotion" type="button" class="btn primary">
+              Enable Motion
+            </button>
           </div>
-          <div class="hud-row">
-            <span class="hud-k">Gyro</span>
-            <span class="hud-v" id="hudGyro">off</span>
+
+          <div class="row">
+            <div class="status">
+              <div class="status-line">
+                <span class="k">MOTION</span>
+                <span class="v" id="motionStatus">OFF</span>
+              </div>
+              <div class="status-line">
+                <span class="k">TOUCH</span>
+                <span class="v" id="touchStatus">ON</span>
+              </div>
+            </div>
           </div>
-          <div class="hud-row hud-hint">
-            <span>Drag: strafe • Double-tap: dash • Tap overlay: enable motion</span>
+
+          <div class="row two">
+            <button id="btnRecenter" type="button" class="btn">
+              Recenter
+            </button>
+            <button id="btnHaptics" type="button" class="btn">
+              Haptics Test
+            </button>
+          </div>
+
+          <div class="row">
+            <div class="hint">
+              On iPhone Safari, web haptics are limited; vibration may not work.
+            </div>
+          </div>
+
+          <div class="row">
+            <pre id="debug" class="debug">α: —  β: —  γ: —</pre>
           </div>
         </div>
       </div>
-
-      <button id="motionOverlay" type="button" class="overlay" aria-label="Enable motion controls">
-        <div class="overlay-inner">
-          <div class="overlay-title">Tap to Enable Motion</div>
-          <div class="overlay-sub">
-            iOS requires a user gesture to enable gyroscope access.
-          </div>
-        </div>
-      </button>
     </div>
 
     <script type="module" src="/src/main.js"></script>
