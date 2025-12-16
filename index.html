@@ -22,6 +22,61 @@
         pointer-events: none;
       }
 
+      #sticks {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+
+      .stick {
+        position: absolute;
+        width: 160px;
+        height: 160px;
+        border-radius: 999px;
+        pointer-events: auto;
+        touch-action: none;
+        opacity: 0.92;
+      }
+
+      .stick .base {
+        position: absolute;
+        inset: 0;
+        border-radius: 999px;
+        background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.02));
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        backdrop-filter: blur(10px);
+      }
+
+      .stick .knob {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 72px;
+        height: 72px;
+        margin-left: -36px;
+        margin-top: -36px;
+        border-radius: 999px;
+        background: radial-gradient(circle at 30% 30%, rgba(180, 220, 255, 0.35), rgba(80, 160, 255, 0.08));
+        border: 1px solid rgba(160, 210, 255, 0.22);
+        box-shadow: 0 0 24px rgba(120, 180, 255, 0.12);
+        transform: translate(0, 0);
+        transition: transform 90ms ease;
+      }
+
+      .stick.active .knob {
+        transition: none;
+      }
+
+      #stickMove {
+        left: 18px;
+        bottom: 18px;
+      }
+
+      #stickAim {
+        right: 18px;
+        bottom: 18px;
+      }
+
       #panel {
         position: absolute;
         left: 16px;
@@ -124,7 +179,7 @@
         width: 10px;
         height: 10px;
         transform: translate(-50%, -50%);
-        opacity: 0.7;
+        opacity: 0.0;
       }
 
       #reticle:before,
@@ -176,7 +231,7 @@
   <body>
     <div id="hud">
       <div id="panel">
-        <h1>Infinite Black Space</h1>
+        <h1>Surface Pulsar (3/4 view)</h1>
         <div class="row">
           <div class="kv"><strong>Status:</strong> <span id="status">Loading…</span></div>
           <div class="kv"><strong>Input:</strong> <span id="input">—</span></div>
@@ -184,34 +239,45 @@
           <div class="kv"><strong>Pos:</strong> <code id="pos">0,0,0</code></div>
         </div>
         <div class="hint">
-          Click to lock the mouse. Connect a DualSense/PS5 controller and press any button.
+          Move your pulsar across the surface in a 3/4 camera view. Use a DualSense/PS5 controller or the on-screen sticks (touch).
           Toggle this panel with <code>Options</code> (controller) or <code>H</code> (keyboard).
         </div>
         <div class="controls" id="controls">
           <div class="title">PS5 / DualSense controls (standard Gamepad mapping)</div>
           <ul>
-            <li><code>Left stick</code>: strafe / forward-back</li>
-            <li><code>Right stick</code>: look (yaw/pitch)</li>
-            <li><code>R2</code>: thrust forward &nbsp; <code>L2</code>: thrust backward</li>
-            <li><code>X</code>: thrust up &nbsp; <code>O</code>: thrust down</li>
+            <li><code>Left stick</code>: move on the surface (relative to camera)</li>
+            <li><code>Right stick</code>: aim / face direction (relative to camera)</li>
             <li><code>□</code>: boost (hold)</li>
             <li><code>△</code>: reset position/velocity</li>
             <li><code>Options</code>: toggle help</li>
           </ul>
           <div class="title" style="margin-top: 10px;">Keyboard / mouse fallback</div>
           <ul>
-            <li><code>WASD</code>: move &nbsp; <code>Space</code>/<code>Shift</code>: up/down</li>
-            <li><code>Mouse</code>: look (when locked)</li>
+            <li><code>WASD</code>: move on surface &nbsp; <code>Arrow keys</code>: aim</li>
             <li><code>R</code>: reset &nbsp; <code>H</code>: toggle help</li>
+          </ul>
+          <div class="title" style="margin-top: 10px;">Touch</div>
+          <ul>
+            <li><code>Left stick</code>: move &nbsp; <code>Right stick</code>: aim</li>
           </ul>
         </div>
       </div>
       <div id="actions">
-        <button id="btnLock">Lock mouse</button>
+        <button id="btnReset">Reset</button>
         <button id="btnFullscreen">Fullscreen</button>
       </div>
       <div id="reticle"></div>
       <div id="toast"></div>
+      <div id="sticks" aria-hidden="true">
+        <div class="stick" id="stickMove">
+          <div class="base"></div>
+          <div class="knob"></div>
+        </div>
+        <div class="stick" id="stickAim">
+          <div class="base"></div>
+          <div class="knob"></div>
+        </div>
+      </div>
     </div>
 
     <script type="module">
@@ -223,9 +289,11 @@
       const posEl = document.getElementById("pos");
       const panelEl = document.getElementById("panel");
       const controlsEl = document.getElementById("controls");
-      const btnLock = document.getElementById("btnLock");
+      const btnReset = document.getElementById("btnReset");
       const btnFullscreen = document.getElementById("btnFullscreen");
       const toastEl = document.getElementById("toast");
+      const stickMoveEl = document.getElementById("stickMove");
+      const stickAimEl = document.getElementById("stickAim");
 
       const toast = (msg, ms = 1400) => {
         toastEl.textContent = msg;
@@ -241,79 +309,133 @@
       document.body.appendChild(renderer.domElement);
 
       const scene = new THREE.Scene();
-      scene.fog = new THREE.FogExp2(0x000000, 0.00006);
+      scene.fog = new THREE.FogExp2(0x000000, 0.012);
 
-      const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.05, 50000);
-
-      // Player rig: yaw on parent, pitch on child
-      const player = new THREE.Object3D();
-      const yawNode = new THREE.Object3D();
-      const pitchNode = new THREE.Object3D();
-      scene.add(player);
-      player.add(yawNode);
-      yawNode.add(pitchNode);
-      pitchNode.add(camera);
-
-      camera.position.set(0, 1.2, 5.5);
-
-      // A subtle "ship" marker so you can orient yourself
-      const ship = new THREE.Mesh(
-        new THREE.ConeGeometry(0.25, 0.8, 10),
-        new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.65 })
-      );
-      ship.rotation.x = Math.PI * 0.5;
-      ship.position.set(0, 0, -1.2);
-      yawNode.add(ship);
-
-      // Stars (wrapped around the player)
-      const STAR_COUNT = 4500;
-      const STAR_RADIUS = 1400;
-      const starPositions = new Float32Array(STAR_COUNT * 3);
-      const randInSphere = () => {
-        // rejection sample within sphere
-        while (true) {
-          const x = (Math.random() * 2 - 1) * STAR_RADIUS;
-          const y = (Math.random() * 2 - 1) * STAR_RADIUS;
-          const z = (Math.random() * 2 - 1) * STAR_RADIUS;
-          if (x * x + y * y + z * z <= STAR_RADIUS * STAR_RADIUS) return [x, y, z];
-        }
-      };
-      for (let i = 0; i < STAR_COUNT; i++) {
-        const [x, y, z] = randInSphere();
-        starPositions[i * 3 + 0] = x;
-        starPositions[i * 3 + 1] = y;
-        starPositions[i * 3 + 2] = z;
-      }
-      const starsGeo = new THREE.BufferGeometry();
-      starsGeo.setAttribute("position", new THREE.BufferAttribute(starPositions, 3));
-      const starsMat = new THREE.PointsMaterial({
-        color: 0xffffff,
-        size: 1.2,
-        sizeAttenuation: true,
-        transparent: true,
-        opacity: 0.85,
-      });
-      const stars = new THREE.Points(starsGeo, starsMat);
-      scene.add(stars);
-
-      // Add a few drifting "asteroids" just for depth
-      const asteroids = [];
-      const AST_COUNT = 80;
-      const astGeo = new THREE.IcosahedronGeometry(1, 0);
-      for (let i = 0; i < AST_COUNT; i++) {
-        const m = new THREE.MeshBasicMaterial({ color: 0x88aaff, transparent: true, opacity: 0.22, wireframe: true });
-        const a = new THREE.Mesh(astGeo, m);
-        a.scale.setScalar(2 + Math.random() * 10);
-        const [x, y, z] = randInSphere();
-        a.position.set(x * 1.4, y * 1.4, z * 1.4);
-        a.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
-        a.userData.spin = new THREE.Vector3(
-          (Math.random() * 2 - 1) * 0.15,
-          (Math.random() * 2 - 1) * 0.15,
-          (Math.random() * 2 - 1) * 0.15
+      // 3/4 view: orthographic camera, fixed angle.
+      let camera;
+      const makeOrthoCamera = () => {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        const aspect = w / h;
+        const viewSize = 18; // world units visible vertically
+        camera = new THREE.OrthographicCamera(
+          (-viewSize * aspect) / 2,
+          (viewSize * aspect) / 2,
+          viewSize / 2,
+          -viewSize / 2,
+          0.1,
+          2000
         );
-        asteroids.push(a);
-        scene.add(a);
+        camera.position.set(18, 18, 18);
+        camera.lookAt(0, 0, 0);
+        // Yaw ~45°, pitch down for 3/4 view
+        camera.rotation.order = "YXZ";
+        camera.rotation.y = Math.PI / 4;
+        camera.rotation.x = -Math.atan(Math.sqrt(2)); // ~ -54.7356°
+        camera.rotation.z = 0;
+        scene.add(camera);
+      };
+      makeOrthoCamera();
+
+      // Player (the "pulsar") on the surface (XZ plane).
+      const player = new THREE.Object3D();
+      scene.add(player);
+
+      // Lighting for surface
+      scene.add(new THREE.AmbientLight(0x7aa8ff, 0.38));
+      const key = new THREE.DirectionalLight(0xd8e8ff, 0.75);
+      key.position.set(40, 60, 25);
+      scene.add(key);
+
+      // Ground plane + grid (moved to feel infinite)
+      const ground = new THREE.Mesh(
+        new THREE.PlaneGeometry(2000, 2000, 1, 1),
+        new THREE.MeshStandardMaterial({
+          color: 0x02040a,
+          metalness: 0.1,
+          roughness: 0.95,
+          transparent: true,
+          opacity: 0.98,
+        })
+      );
+      ground.rotation.x = -Math.PI / 2;
+      ground.position.y = 0;
+      scene.add(ground);
+
+      const grid = new THREE.GridHelper(240, 60, 0x2a5cff, 0x0b1a33);
+      {
+        const mats = Array.isArray(grid.material) ? grid.material : [grid.material];
+        for (const m of mats) {
+          m.transparent = true;
+          m.opacity = 0.55;
+        }
+      }
+      grid.position.y = 0.01;
+      scene.add(grid);
+
+      // Pulsar visuals: emissive core + glow sprite
+      const core = new THREE.Mesh(
+        new THREE.SphereGeometry(0.55, 32, 20),
+        new THREE.MeshStandardMaterial({
+          color: 0x9bd3ff,
+          emissive: 0x4aa6ff,
+          emissiveIntensity: 1.3,
+          metalness: 0.0,
+          roughness: 0.2,
+        })
+      );
+      core.position.y = 0.55;
+      player.add(core);
+
+      const makeGlowTexture = () => {
+        const c = document.createElement("canvas");
+        c.width = 256;
+        c.height = 256;
+        const ctx = c.getContext("2d");
+        const g = ctx.createRadialGradient(128, 128, 6, 128, 128, 118);
+        g.addColorStop(0.0, "rgba(160, 220, 255, 0.80)");
+        g.addColorStop(0.25, "rgba(120, 190, 255, 0.30)");
+        g.addColorStop(0.6, "rgba(80, 160, 255, 0.12)");
+        g.addColorStop(1.0, "rgba(80, 160, 255, 0.00)");
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, 256, 256);
+        const tex = new THREE.CanvasTexture(c);
+        tex.colorSpace = THREE.SRGBColorSpace;
+        return tex;
+      };
+      const glow = new THREE.Sprite(
+        new THREE.SpriteMaterial({
+          map: makeGlowTexture(),
+          transparent: true,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+          opacity: 0.9,
+        })
+      );
+      glow.scale.set(4.2, 4.2, 1);
+      glow.position.y = 0.8;
+      player.add(glow);
+
+      const pulseLight = new THREE.PointLight(0x57b0ff, 1.2, 18, 1.6);
+      pulseLight.position.set(0, 1.2, 0);
+      player.add(pulseLight);
+
+      // Some surface "rocks" for depth
+      const rocks = [];
+      const rockGeo = new THREE.DodecahedronGeometry(0.7, 0);
+      for (let i = 0; i < 80; i++) {
+        const m = new THREE.MeshStandardMaterial({
+          color: 0x0b1020,
+          metalness: 0.0,
+          roughness: 1.0,
+          emissive: 0x000000,
+        });
+        const r = new THREE.Mesh(rockGeo, m);
+        r.scale.setScalar(0.5 + Math.random() * 2.3);
+        r.position.set((Math.random() * 2 - 1) * 120, 0.2, (Math.random() * 2 - 1) * 120);
+        r.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+        rocks.push(r);
+        scene.add(r);
       }
 
       const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -326,19 +448,75 @@
 
       // Input state
       const keys = new Set();
-      let mouseLocked = false;
-      let yaw = 0;
-      let pitch = 0;
-
       const velocity = new THREE.Vector3();
       const tmpVec = new THREE.Vector3();
-      const tmpQuat = new THREE.Quaternion();
+      const camForwardFlat = new THREE.Vector3();
+      const camRightFlat = new THREE.Vector3();
+      const desiredDir = new THREE.Vector3();
+      let facingYaw = 0; // radians
+
+      // Virtual sticks (touch / pointer)
+      function makeStick(el) {
+        const knob = el.querySelector(".knob");
+        const state = { x: 0, y: 0, active: false, pid: null };
+
+        const centerFromRect = (rect) => ({ cx: rect.left + rect.width / 2, cy: rect.top + rect.height / 2, r: rect.width / 2 });
+        const setKnob = (nx, ny) => {
+          // nx, ny in [-1..1]
+          const rect = el.getBoundingClientRect();
+          const { r } = centerFromRect(rect);
+          const max = r - 40;
+          knob.style.transform = `translate(${nx * max}px, ${ny * max}px)`;
+        };
+        const updateFromPointer = (e) => {
+          const rect = el.getBoundingClientRect();
+          const { cx, cy, r } = centerFromRect(rect);
+          const dx = e.clientX - cx;
+          const dy = e.clientY - cy;
+          const max = r - 40;
+          const len = Math.hypot(dx, dy);
+          const k = len > 0 ? Math.min(1, len / max) : 0;
+          const nx = len > 0 ? (dx / len) * k : 0;
+          const ny = len > 0 ? (dy / len) * k : 0;
+          state.x = nx;
+          state.y = ny;
+          setKnob(nx, ny);
+        };
+
+        el.addEventListener("pointerdown", (e) => {
+          el.classList.add("active");
+          state.active = true;
+          state.pid = e.pointerId;
+          el.setPointerCapture(e.pointerId);
+          updateFromPointer(e);
+        });
+        el.addEventListener("pointermove", (e) => {
+          if (!state.active || e.pointerId !== state.pid) return;
+          updateFromPointer(e);
+        });
+        const end = (e) => {
+          if (!state.active || e.pointerId !== state.pid) return;
+          el.classList.remove("active");
+          state.active = false;
+          state.pid = null;
+          state.x = 0;
+          state.y = 0;
+          knob.style.transform = `translate(0px, 0px)`;
+        };
+        el.addEventListener("pointerup", end);
+        el.addEventListener("pointercancel", end);
+
+        return state;
+      }
+
+      const stickMove = makeStick(stickMoveEl);
+      const stickAim = makeStick(stickAimEl);
 
       const resetPlayer = () => {
         player.position.set(0, 0, 0);
         velocity.set(0, 0, 0);
-        yaw = 0;
-        pitch = 0;
+        facingYaw = 0;
+        player.rotation.y = 0;
         toast("Reset");
       };
 
@@ -352,30 +530,9 @@
         keys.add(e.code);
         if (e.code === "KeyH") toggleHelp();
         if (e.code === "KeyR") resetPlayer();
-        if (e.code === "Escape") {
-          if (document.pointerLockElement) document.exitPointerLock();
-        }
       });
       window.addEventListener("keyup", (e) => keys.delete(e.code));
-
-      const requestMouseLock = () => renderer.domElement.requestPointerLock?.();
-      btnLock.addEventListener("click", requestMouseLock);
-      renderer.domElement.addEventListener("click", requestMouseLock);
-
-      document.addEventListener("pointerlockchange", () => {
-        mouseLocked = document.pointerLockElement === renderer.domElement;
-        toast(mouseLocked ? "Mouse locked" : "Mouse unlocked");
-      });
-
-      window.addEventListener("mousemove", (e) => {
-        if (!mouseLocked) return;
-        const mx = e.movementX || 0;
-        const my = e.movementY || 0;
-        const sens = 0.0022;
-        yaw -= mx * sens;
-        pitch -= my * sens;
-        pitch = clamp(pitch, -1.45, 1.45);
-      });
+      btnReset.addEventListener("click", resetPlayer);
 
       btnFullscreen.addEventListener("click", async () => {
         try {
@@ -429,18 +586,6 @@
         return cur === 1 && prev === 0;
       };
 
-      const wrapAround = (obj, center, radius) => {
-        // Wrap each axis into a cube for cheap "infinite" effect
-        const r = radius;
-        const p = obj.position;
-        if (p.x - center.x > r) p.x -= 2 * r;
-        if (p.x - center.x < -r) p.x += 2 * r;
-        if (p.y - center.y > r) p.y -= 2 * r;
-        if (p.y - center.y < -r) p.y += 2 * r;
-        if (p.z - center.z > r) p.z -= 2 * r;
-        if (p.z - center.z < -r) p.z += 2 * r;
-      };
-
       const clock = new THREE.Clock();
       statusEl.textContent = "Running";
 
@@ -451,102 +596,109 @@
         // Resolve input
         const gp = getActiveGamepad();
         const usingPad = !!gp;
-        inputEl.textContent = usingPad ? `Controller (${padName(gp)})` : mouseLocked ? "Keyboard+Mouse (locked)" : "Keyboard+Mouse";
+        const usingTouch = stickMove.active || stickAim.active;
+        inputEl.textContent = usingPad ? `Controller (${padName(gp)})` : usingTouch ? "Touch (dual sticks)" : "Keyboard";
 
-        // Look input
-        let lookX = 0;
-        let lookY = 0;
-
-        // Move input in local space
+        // Move/aim input in "stick space"
         let moveX = 0;
-        let moveZ = 0;
-        let moveY = 0;
-        let thrust = 0;
+        let moveY = 0; // forward/back (screen up/down)
+        let aimX = 0;
+        let aimY = 0;
         let boost = 0;
 
         if (usingPad) {
           // Standard mapping: axes[0]=LS X, axes[1]=LS Y, axes[2]=RS X, axes[3]=RS Y
-          moveX = deadzone(gp.axes?.[0] ?? 0);
-          moveZ = deadzone(gp.axes?.[1] ?? 0);
-          lookX = deadzone(gp.axes?.[2] ?? 0, 0.07);
-          lookY = deadzone(gp.axes?.[3] ?? 0, 0.07);
-
-          const r2 = gp.buttons?.[7]?.value ?? 0; // R2
-          const l2 = gp.buttons?.[6]?.value ?? 0; // L2
-          thrust = clamp(r2 - l2, -1, 1);
-
-          const xBtn = gp.buttons?.[0]?.pressed; // Cross
-          const oBtn = gp.buttons?.[1]?.pressed; // Circle
-          moveY = (xBtn ? 1 : 0) + (oBtn ? -1 : 0);
-
+          moveX = deadzone(gp.axes?.[0] ?? 0, 0.08);
+          moveY = deadzone(-(gp.axes?.[1] ?? 0), 0.08);
+          aimX = deadzone(gp.axes?.[2] ?? 0, 0.10);
+          aimY = deadzone(-(gp.axes?.[3] ?? 0), 0.10);
           boost = gp.buttons?.[2]?.pressed ? 1 : 0; // Square
 
           if (btnPressed(gp, 3)) resetPlayer(); // Triangle
           if (btnPressed(gp, 9)) toggleHelp(); // Options
+        } else if (usingTouch) {
+          moveX = deadzone(stickMove.x, 0.06);
+          moveY = deadzone(-stickMove.y, 0.06);
+          aimX = deadzone(stickAim.x, 0.06);
+          aimY = deadzone(-stickAim.y, 0.06);
+          boost = 0;
         } else {
-          // Keyboard
+          // Keyboard fallback
           const k = (c) => keys.has(c);
           moveX = (k("KeyD") ? 1 : 0) + (k("KeyA") ? -1 : 0);
-          moveZ = (k("KeyS") ? 1 : 0) + (k("KeyW") ? -1 : 0);
-          moveY = (k("Space") ? 1 : 0) + (k("ShiftLeft") || k("ShiftRight") ? -1 : 0);
-          thrust = (k("ArrowUp") ? 1 : 0) + (k("ArrowDown") ? -1 : 0);
-          boost = k("ControlLeft") || k("ControlRight") ? 1 : 0;
-
-          // Right stick equivalent via arrow keys (optional)
-          lookX = (k("ArrowRight") ? 1 : 0) + (k("ArrowLeft") ? -1 : 0);
-          lookY = (k("KeyK") ? 1 : 0) + (k("KeyI") ? -1 : 0);
+          moveY = (k("KeyW") ? 1 : 0) + (k("KeyS") ? -1 : 0);
+          aimX = (k("ArrowRight") ? 1 : 0) + (k("ArrowLeft") ? -1 : 0);
+          aimY = (k("ArrowUp") ? 1 : 0) + (k("ArrowDown") ? -1 : 0);
+          boost = k("ShiftLeft") || k("ShiftRight") ? 1 : 0;
         }
 
-        // Apply look
-        const lookSpeed = usingPad ? 2.1 : 1.5;
-        yaw -= lookX * lookSpeed * dt;
-        pitch -= lookY * lookSpeed * dt;
-        pitch = clamp(pitch, -1.45, 1.45);
+        // Camera-relative flat basis (on ground plane)
+        camera.getWorldDirection(camForwardFlat);
+        camForwardFlat.y = 0;
+        if (camForwardFlat.lengthSq() < 1e-6) camForwardFlat.set(0, 0, -1);
+        camForwardFlat.normalize();
+        camRightFlat.crossVectors(new THREE.Vector3(0, 1, 0), camForwardFlat).normalize(); // right = up x forward
 
-        yawNode.rotation.y = yaw;
-        pitchNode.rotation.x = pitch;
-
-        // Build desired acceleration in local space
-        const boostMul = boost ? 2.2 : 1.0;
-        const accel = 26.0 * boostMul;
-        const strafe = 18.0 * boostMul;
-        const lift = 16.0 * boostMul;
-
-        // Local direction vectors from yaw/pitch (but keep strafe flat-ish on yaw)
-        tmpQuat.setFromEuler(new THREE.Euler(0, yaw, 0, "YXZ"));
-
-        // forward/back from yaw+pitch
-        const fwdQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(pitch, yaw, 0, "YXZ"));
-        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(fwdQuat);
-        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(tmpQuat);
-        const up = new THREE.Vector3(0, 1, 0);
-
-        const ax = right.multiplyScalar(moveX * strafe);
-        const az = forward.multiplyScalar((thrust - moveZ) * accel);
-        const ay = up.multiplyScalar(moveY * lift);
-
-        tmpVec.copy(ax).add(az).add(ay);
+        // Desired acceleration on surface
+        const boostMul = boost ? 1.75 : 1.0;
+        const accel = 38.0 * boostMul;
+        tmpVec
+          .set(0, 0, 0)
+          .addScaledVector(camRightFlat, moveX * accel)
+          .addScaledVector(camForwardFlat, moveY * accel);
+        tmpVec.y = 0;
 
         // Integrate velocity with damping
         velocity.addScaledVector(tmpVec, dt);
-        const damping = usingPad ? 0.06 : 0.08;
+        const damping = 0.12;
         velocity.multiplyScalar(Math.pow(1 - damping, dt * 60));
+        velocity.y = 0;
 
         // Soft speed cap
-        const maxSpeed = 240 * boostMul;
+        const maxSpeed = 18 * boostMul;
         const spd = velocity.length();
         if (spd > maxSpeed) velocity.multiplyScalar(maxSpeed / spd);
 
         player.position.addScaledVector(velocity, dt);
+        player.position.y = 0;
 
-        // Wrap stars/asteroids around player to feel infinite
-        stars.position.copy(player.position);
-        for (const a of asteroids) {
-          a.rotation.x += a.userData.spin.x * dt;
-          a.rotation.y += a.userData.spin.y * dt;
-          a.rotation.z += a.userData.spin.z * dt;
-          wrapAround(a, player.position, STAR_RADIUS * 2.1);
+        // Aim/facing: right stick (or arrow keys) aims relative to camera.
+        desiredDir
+          .set(0, 0, 0)
+          .addScaledVector(camRightFlat, aimX)
+          .addScaledVector(camForwardFlat, aimY);
+        desiredDir.y = 0;
+
+        const hasAim = desiredDir.lengthSq() > 0.04;
+        const hasMove = (moveX * moveX + moveY * moveY) > 0.02;
+        if (hasAim) {
+          desiredDir.normalize();
+          facingYaw = Math.atan2(desiredDir.x, desiredDir.z);
+        } else if (hasMove && spd > 0.2) {
+          facingYaw = Math.atan2(velocity.x, velocity.z);
         }
+        // Smooth facing
+        const turnSpeed = 12.0;
+        const delta = ((((facingYaw - player.rotation.y) + Math.PI) % (Math.PI * 2)) + (Math.PI * 2)) % (Math.PI * 2) - Math.PI;
+        player.rotation.y += clamp(delta, -turnSpeed * dt, turnSpeed * dt);
+
+        // Follow camera (fixed 3/4 angle, trailing offset)
+        const camOffset = new THREE.Vector3(18, 18, 18);
+        camera.position.copy(player.position).add(camOffset);
+        camera.lookAt(player.position.x, player.position.y, player.position.z);
+
+        // Fake "infinite" surface by moving grid origin
+        const cell = 4;
+        grid.position.x = Math.round(player.position.x / cell) * cell;
+        grid.position.z = Math.round(player.position.z / cell) * cell;
+        ground.position.x = grid.position.x;
+        ground.position.z = grid.position.z;
+
+        // Pulse the glow/light a bit
+        const t = clock.elapsedTime;
+        glow.material.opacity = 0.78 + 0.18 * Math.sin(t * 3.4);
+        core.material.emissiveIntensity = 1.1 + 0.35 * Math.sin(t * 4.1);
+        pulseLight.intensity = 1.1 + 0.35 * Math.sin(t * 4.0);
 
         // HUD
         speedEl.textContent = spd.toFixed(1);
@@ -556,13 +708,14 @@
       }
 
       window.addEventListener("resize", () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
+        // Rebuild ortho camera to keep consistent scale.
+        if (camera) scene.remove(camera);
+        makeOrthoCamera();
         renderer.setSize(window.innerWidth, window.innerHeight);
       });
 
       // Initial hint
-      toast("Click to lock mouse • Plug in PS5 controller and press any button", 2200);
+      toast("Use left stick to move • right stick to aim • □ to boost • △ to reset", 2400);
       animate();
     </script>
   </body>
