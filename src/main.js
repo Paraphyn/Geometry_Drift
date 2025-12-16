@@ -93,46 +93,52 @@ ship.position.set(0, -0.12, -0.75);
 yawNode.add(ship);
 
 // ----------------------------
-// Stars (InstancedMesh)
+// Glowing white sphere (emissive core + cheap halo)
 // ----------------------------
-const STAR_COUNT = 1500; // >= 1000 requirement
-const STAR_RADIUS = 140; // around camera
+const glowCore = new THREE.Mesh(
+  new THREE.SphereGeometry(0.9, 32, 16),
+  new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    emissive: 0xffffff,
+    emissiveIntensity: 6.0,
+    roughness: 0.25,
+    metalness: 0.0,
+  }),
+);
+// Keep it bright even under tone mapping (common mobile/defaults)
+glowCore.material.toneMapped = false;
+glowCore.position.set(2.2, 1.3, -14);
+scene.add(glowCore);
 
-const starGeo = new THREE.SphereGeometry(0.08, 6, 6);
-const starMat = new THREE.MeshBasicMaterial({
-  color: 0xffffff,
-  fog: true,
-});
+const glowHalo1 = new THREE.Mesh(
+  new THREE.SphereGeometry(1.35, 32, 16),
+  new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0.18,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    side: THREE.BackSide,
+  }),
+);
+glowHalo1.material.toneMapped = false;
+glowHalo1.position.copy(glowCore.position);
+scene.add(glowHalo1);
 
-const stars = new THREE.InstancedMesh(starGeo, starMat, STAR_COUNT);
-stars.frustumCulled = false;
-scene.add(stars);
-
-const _m4 = new THREE.Matrix4();
-const _pos = new THREE.Vector3();
-const _quat = new THREE.Quaternion();
-const _s = new THREE.Vector3();
-
-function randInSphere(radius) {
-  // rejection sample
-  while (true) {
-    const x = (Math.random() * 2 - 1) * radius;
-    const y = (Math.random() * 2 - 1) * radius;
-    const z = (Math.random() * 2 - 1) * radius;
-    if (x * x + y * y + z * z <= radius * radius) return [x, y, z];
-  }
-}
-
-for (let i = 0; i < STAR_COUNT; i++) {
-  const [x, y, z] = randInSphere(STAR_RADIUS);
-  _pos.set(x, y * 0.6, z);
-  _quat.identity();
-  const scale = 0.7 + Math.random() * 2.2;
-  _s.setScalar(scale);
-  _m4.compose(_pos, _quat, _s);
-  stars.setMatrixAt(i, _m4);
-}
-stars.instanceMatrix.needsUpdate = true;
+const glowHalo2 = new THREE.Mesh(
+  new THREE.SphereGeometry(2.1, 32, 16),
+  new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0.08,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    side: THREE.BackSide,
+  }),
+);
+glowHalo2.material.toneMapped = false;
+glowHalo2.position.copy(glowCore.position);
+scene.add(glowHalo2);
 
 // ----------------------------
 // Controls: touch joystick (single finger drag)
@@ -347,9 +353,7 @@ function animate() {
   // Integrate position
   player.position.addScaledVector(vel, dt);
 
-  // Infinite illusion: keep the star field centered around the camera
   camera.getWorldPosition(_camWorld);
-  stars.position.copy(_camWorld);
 
   // Collision check vs reference cube
   const d = _camWorld.distanceTo(refCube.position);
