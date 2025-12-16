@@ -37,12 +37,13 @@ export function createScene(canvas) {
     if (!ctx) return null;
 
     const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-    // Softer falloff: less "hard" center, more mid-radius energy.
+    // Shorter glow distance + slight cyan tint outward (center stays white).
     g.addColorStop(0.0, 'rgba(255,255,255,1.0)');
-    g.addColorStop(0.08, 'rgba(255,255,255,0.90)');
-    g.addColorStop(0.25, 'rgba(255,255,255,0.55)');
-    g.addColorStop(0.60, 'rgba(255,255,255,0.18)');
-    g.addColorStop(1.0, 'rgba(255,255,255,0.0)');
+    g.addColorStop(0.06, 'rgba(255,255,255,0.92)');
+    g.addColorStop(0.16, 'rgba(170,255,255,0.55)');
+    g.addColorStop(0.32, 'rgba(90,235,255,0.22)');
+    g.addColorStop(0.52, 'rgba(40,190,220,0.00)');
+    g.addColorStop(1.0, 'rgba(0,0,0,0.0)');
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, size, size);
 
@@ -65,7 +66,7 @@ export function createScene(canvas) {
 
   const haloMat = new THREE.MeshBasicMaterial({
     map: glowTex || null,
-    color: 0xffffff,
+    color: 0xe8ffff,
     transparent: true,
     opacity: 0.9,
     blending: THREE.AdditiveBlending,
@@ -73,7 +74,7 @@ export function createScene(canvas) {
   });
   const haloOuterMat = new THREE.MeshBasicMaterial({
     map: glowTex || null,
-    color: 0xffffff,
+    color: 0xc8ffff,
     transparent: true,
     opacity: 0.35,
     blending: THREE.AdditiveBlending,
@@ -81,9 +82,9 @@ export function createScene(canvas) {
   });
 
   // Two-layer glow reads softer than a single halo.
-  const halo = new THREE.Mesh(new THREE.CircleGeometry(0.22, 64), haloMat);
+  const halo = new THREE.Mesh(new THREE.CircleGeometry(0.18, 64), haloMat);
   halo.renderOrder = 1;
-  const haloOuter = new THREE.Mesh(new THREE.CircleGeometry(0.36, 64), haloOuterMat);
+  const haloOuter = new THREE.Mesh(new THREE.CircleGeometry(0.28, 64), haloOuterMat);
   haloOuter.renderOrder = 0;
 
   indicator.add(haloOuter, halo, circle);
@@ -139,17 +140,17 @@ export function createScene(canvas) {
   function update(dt) {
     t += dt;
 
-    // Fast pulsations: drive glow with a ~7.5Hz eased sine.
-    const PULSE_HZ = 7.5;
+    // Faster + "shorter" pulses (less time spent near peak).
+    const PULSE_HZ = 11.0;
     const s = Math.sin(t * Math.PI * 2 * PULSE_HZ); // [-1, 1]
     const pulse01 = 0.5 + 0.5 * s; // [0, 1]
-    const pulse = Math.pow(pulse01, 1.7); // sharper peaks, still smooth
+    const pulse = Math.pow(pulse01, 2.35); // sharper peaks, still smooth
 
-    haloMat.opacity = 0.65 + 0.55 * pulse;
-    haloOuterMat.opacity = 0.18 + 0.55 * pulse;
+    haloMat.opacity = 0.55 + 0.55 * pulse;
+    haloOuterMat.opacity = 0.10 + 0.45 * pulse;
 
-    const innerScale = 1.0 + 0.22 * pulse;
-    const outerScale = 1.0 + 0.32 * pulse;
+    const innerScale = 1.0 + 0.14 * pulse;
+    const outerScale = 1.0 + 0.18 * pulse;
     halo.scale.setScalar(innerScale);
     haloOuter.scale.setScalar(outerScale);
 
