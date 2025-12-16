@@ -27,6 +27,7 @@ export function createScene(canvas) {
   camera.position.set(0, 0, 0);
 
   // Center indicator: white circle + soft glow (attached to camera so it's always centered)
+  // "Fast pulsations" are implemented by modulating glow opacity + scale in `update()`.
   const glowTex = (() => {
     const size = 256;
     const cnv = document.createElement('canvas');
@@ -36,9 +37,11 @@ export function createScene(canvas) {
     if (!ctx) return null;
 
     const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    // Softer falloff: less "hard" center, more mid-radius energy.
     g.addColorStop(0.0, 'rgba(255,255,255,1.0)');
-    g.addColorStop(0.18, 'rgba(255,255,255,0.95)');
-    g.addColorStop(0.45, 'rgba(255,255,255,0.35)');
+    g.addColorStop(0.08, 'rgba(255,255,255,0.90)');
+    g.addColorStop(0.25, 'rgba(255,255,255,0.55)');
+    g.addColorStop(0.60, 'rgba(255,255,255,0.18)');
     g.addColorStop(1.0, 'rgba(255,255,255,0.0)');
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, size, size);
@@ -60,20 +63,30 @@ export function createScene(canvas) {
   );
   circle.renderOrder = 2;
 
-  const halo = new THREE.Mesh(
-    new THREE.CircleGeometry(0.16, 64),
-    new THREE.MeshBasicMaterial({
-      map: glowTex || null,
-      color: 0xffffff,
-      transparent: true,
-      opacity: 0.95,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    }),
-  );
-  halo.renderOrder = 1;
+  const haloMat = new THREE.MeshBasicMaterial({
+    map: glowTex || null,
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0.9,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  const haloOuterMat = new THREE.MeshBasicMaterial({
+    map: glowTex || null,
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0.35,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
 
-  indicator.add(halo, circle);
+  // Two-layer glow reads softer than a single halo.
+  const halo = new THREE.Mesh(new THREE.CircleGeometry(0.22, 64), haloMat);
+  halo.renderOrder = 1;
+  const haloOuter = new THREE.Mesh(new THREE.CircleGeometry(0.36, 64), haloOuterMat);
+  haloOuter.renderOrder = 0;
+
+  indicator.add(haloOuter, halo, circle);
   camera.add(indicator);
   scene.add(camera);
 
@@ -122,7 +135,24 @@ export function createScene(canvas) {
   /**
    * @param {number} dt
    */
+  let t = 0;
   function update(dt) {
+    t += dt;
+
+    // Fast pulsations: drive glow with a ~7.5Hz eased sine.
+    const PULSE_HZ = 7.5;
+    const s = Math.sin(t * Math.PI * 2 * PULSE_HZ); // [-1, 1]
+    const pulse01 = 0.5 + 0.5 * s; // [0, 1]
+    const pulse = Math.pow(pulse01, 1.7); // sharper peaks, still smooth
+
+    haloMat.opacity = 0.65 + 0.55 * pulse;
+    haloOuterMat.opacity = 0.18 + 0.55 * pulse;
+
+    const innerScale = 1.0 + 0.22 * pulse;
+    const outerScale = 1.0 + 0.32 * pulse;
+    halo.scale.setScalar(innerScale);
+    haloOuter.scale.setScalar(outerScale);
+
     const pos = geo.attributes.position.array;
     for (let i = 0; i < STAR_COUNT; i++) {
       const idx = i * 3 + 2;
