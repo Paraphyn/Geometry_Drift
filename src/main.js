@@ -21,6 +21,40 @@ import { createMotionController } from './motion.js';
 const canvas = /** @type {HTMLCanvasElement} */ (document.getElementById('c'));
 
 // ----------------------------
+// Background music (must start from user gesture due to autoplay policies)
+// ----------------------------
+// Place the file at: /workspace/public/universe-travel.mp3 (served as /universe-travel.mp3)
+const bgm = new Audio('/universe-travel.mp3');
+bgm.loop = true;
+bgm.preload = 'auto';
+bgm.volume = 0.45;
+bgm.playsInline = true;
+
+let triedAudio = false;
+async function startBgmFromUserGesture() {
+  if (triedAudio) return;
+  triedAudio = true;
+  try {
+    await bgm.play();
+  } catch {
+    // Ignore: missing file, or browser blocked autoplay despite gesture.
+  }
+}
+
+document.addEventListener(
+  'visibilitychange',
+  () => {
+    if (document.hidden) {
+      bgm.pause();
+    } else if (triedAudio) {
+      // Try to resume, but don't throw if blocked.
+      bgm.play().catch(() => {});
+    }
+  },
+  { passive: true },
+);
+
+// ----------------------------
 // Modules
 // ----------------------------
 const space = createScene(canvas);
@@ -31,6 +65,7 @@ let triedMotion = false;
 canvas.addEventListener(
   'pointerdown',
   async () => {
+    startBgmFromUserGesture();
     if (triedMotion) return;
     triedMotion = true;
     const ok = await motion.enableMotionFromUserGesture();
