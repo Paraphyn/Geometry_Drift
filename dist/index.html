@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="format-detection" content="telephone=no" />
+    <title>Infinite 3D Space (iPhone)</title>
+    <script type="module" crossorigin src="/assets/index-B6GwY1MF.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-Nv1kdUGZ.css">
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="c"></canvas>
+
+      <div id="hud" aria-live="polite">
+        <div class="hud-card">
+          <div class="hud-row">
+            <span class="hud-k">Speed</span>
+            <span class="hud-v" id="hudSpeed">0.0</span>
+          </div>
+          <div class="hud-row">
+            <span class="hud-k">Gyro</span>
+            <span class="hud-v" id="hudGyro">off</span>
+          </div>
+          <div class="hud-row hud-hint">
+            <span>Drag: strafe • Double-tap: dash • Tap overlay: enable motion</span>
+          </div>
+        </div>
+      </div>
+
+      <button id="motionOverlay" type="button" class="overlay" aria-label="Enable motion controls">
+        <div class="overlay-inner">
+          <div class="overlay-title">Tap to Enable Motion</div>
+          <div class="overlay-sub">
+            iOS requires a user gesture to enable gyroscope access.
+          </div>
+        </div>
+      </button>
+    </div>
+
+  </body>
+</html>
