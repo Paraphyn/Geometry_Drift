@@ -1,14 +1,569 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>JumpUp Game</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="style.css">
-</head>
-<body>
-  <canvas id="gameCanvas"></canvas>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Infinite Black Space (PS5 Controller)</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #000;
+        overflow: hidden;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto,
+          Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+        color: #fff;
+      }
 
-  <script src="game.js"></script>
-</body>
+      #hud {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+      }
+
+      #panel {
+        position: absolute;
+        left: 16px;
+        top: 16px;
+        max-width: min(520px, calc(100vw - 32px));
+        background: rgba(0, 0, 0, 0.55);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 12px;
+        padding: 12px 14px;
+        backdrop-filter: blur(10px);
+      }
+
+      #panel h1 {
+        margin: 0 0 8px;
+        font-size: 14px;
+        letter-spacing: 0.3px;
+        font-weight: 650;
+        opacity: 0.95;
+      }
+
+      #panel .row {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+
+      #panel .kv {
+        font-size: 12px;
+        opacity: 0.9;
+        line-height: 1.35;
+      }
+
+      #panel code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+          "Liberation Mono", "Courier New", monospace;
+        font-size: 11px;
+        opacity: 0.95;
+      }
+
+      #panel .hint {
+        margin-top: 10px;
+        font-size: 12px;
+        opacity: 0.85;
+        line-height: 1.4;
+      }
+
+      #panel .controls {
+        margin-top: 10px;
+        font-size: 12px;
+        opacity: 0.9;
+        line-height: 1.45;
+      }
+
+      #panel .controls .title {
+        font-weight: 650;
+        margin-bottom: 6px;
+        opacity: 0.95;
+      }
+
+      #panel ul {
+        margin: 6px 0 0;
+        padding-left: 18px;
+      }
+
+      #panel li {
+        margin: 2px 0;
+      }
+
+      #actions {
+        position: absolute;
+        right: 16px;
+        top: 16px;
+        display: flex;
+        gap: 10px;
+        pointer-events: auto;
+      }
+
+      button {
+        appearance: none;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        background: rgba(20, 20, 20, 0.55);
+        color: #fff;
+        padding: 10px 12px;
+        border-radius: 10px;
+        cursor: pointer;
+        font-size: 12px;
+        letter-spacing: 0.2px;
+        backdrop-filter: blur(10px);
+      }
+
+      button:hover {
+        border-color: rgba(255, 255, 255, 0.28);
+      }
+
+      #reticle {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 10px;
+        height: 10px;
+        transform: translate(-50%, -50%);
+        opacity: 0.7;
+      }
+
+      #reticle:before,
+      #reticle:after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        background: rgba(255, 255, 255, 0.8);
+        transform: translate(-50%, -50%);
+      }
+
+      #reticle:before {
+        width: 10px;
+        height: 2px;
+      }
+
+      #reticle:after {
+        width: 2px;
+        height: 10px;
+      }
+
+      #toast {
+        position: absolute;
+        left: 50%;
+        bottom: 18px;
+        transform: translateX(-50%);
+        background: rgba(0, 0, 0, 0.55);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 999px;
+        padding: 10px 14px;
+        font-size: 12px;
+        opacity: 0;
+        transition: opacity 180ms ease;
+        pointer-events: none;
+        white-space: nowrap;
+      }
+
+      #toast.show {
+        opacity: 1;
+      }
+
+      canvas {
+        display: block;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="hud">
+      <div id="panel">
+        <h1>Infinite Black Space</h1>
+        <div class="row">
+          <div class="kv"><strong>Status:</strong> <span id="status">Loading…</span></div>
+          <div class="kv"><strong>Input:</strong> <span id="input">—</span></div>
+          <div class="kv"><strong>Speed:</strong> <span id="speed">0</span></div>
+          <div class="kv"><strong>Pos:</strong> <code id="pos">0,0,0</code></div>
+        </div>
+        <div class="hint">
+          Click to lock the mouse. Connect a DualSense/PS5 controller and press any button.
+          Toggle this panel with <code>Options</code> (controller) or <code>H</code> (keyboard).
+        </div>
+        <div class="controls" id="controls">
+          <div class="title">PS5 / DualSense controls (standard Gamepad mapping)</div>
+          <ul>
+            <li><code>Left stick</code>: strafe / forward-back</li>
+            <li><code>Right stick</code>: look (yaw/pitch)</li>
+            <li><code>R2</code>: thrust forward &nbsp; <code>L2</code>: thrust backward</li>
+            <li><code>X</code>: thrust up &nbsp; <code>O</code>: thrust down</li>
+            <li><code>□</code>: boost (hold)</li>
+            <li><code>△</code>: reset position/velocity</li>
+            <li><code>Options</code>: toggle help</li>
+          </ul>
+          <div class="title" style="margin-top: 10px;">Keyboard / mouse fallback</div>
+          <ul>
+            <li><code>WASD</code>: move &nbsp; <code>Space</code>/<code>Shift</code>: up/down</li>
+            <li><code>Mouse</code>: look (when locked)</li>
+            <li><code>R</code>: reset &nbsp; <code>H</code>: toggle help</li>
+          </ul>
+        </div>
+      </div>
+      <div id="actions">
+        <button id="btnLock">Lock mouse</button>
+        <button id="btnFullscreen">Fullscreen</button>
+      </div>
+      <div id="reticle"></div>
+      <div id="toast"></div>
+    </div>
+
+    <script type="module">
+      import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
+
+      const statusEl = document.getElementById("status");
+      const inputEl = document.getElementById("input");
+      const speedEl = document.getElementById("speed");
+      const posEl = document.getElementById("pos");
+      const panelEl = document.getElementById("panel");
+      const controlsEl = document.getElementById("controls");
+      const btnLock = document.getElementById("btnLock");
+      const btnFullscreen = document.getElementById("btnFullscreen");
+      const toastEl = document.getElementById("toast");
+
+      const toast = (msg, ms = 1400) => {
+        toastEl.textContent = msg;
+        toastEl.classList.add("show");
+        window.clearTimeout(toastEl._t);
+        toastEl._t = window.setTimeout(() => toastEl.classList.remove("show"), ms);
+      };
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+      renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setClearColor(0x000000, 1);
+      document.body.appendChild(renderer.domElement);
+
+      const scene = new THREE.Scene();
+      scene.fog = new THREE.FogExp2(0x000000, 0.00006);
+
+      const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.05, 50000);
+
+      // Player rig: yaw on parent, pitch on child
+      const player = new THREE.Object3D();
+      const yawNode = new THREE.Object3D();
+      const pitchNode = new THREE.Object3D();
+      scene.add(player);
+      player.add(yawNode);
+      yawNode.add(pitchNode);
+      pitchNode.add(camera);
+
+      camera.position.set(0, 1.2, 5.5);
+
+      // A subtle "ship" marker so you can orient yourself
+      const ship = new THREE.Mesh(
+        new THREE.ConeGeometry(0.25, 0.8, 10),
+        new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.65 })
+      );
+      ship.rotation.x = Math.PI * 0.5;
+      ship.position.set(0, 0, -1.2);
+      yawNode.add(ship);
+
+      // Stars (wrapped around the player)
+      const STAR_COUNT = 4500;
+      const STAR_RADIUS = 1400;
+      const starPositions = new Float32Array(STAR_COUNT * 3);
+      const randInSphere = () => {
+        // rejection sample within sphere
+        while (true) {
+          const x = (Math.random() * 2 - 1) * STAR_RADIUS;
+          const y = (Math.random() * 2 - 1) * STAR_RADIUS;
+          const z = (Math.random() * 2 - 1) * STAR_RADIUS;
+          if (x * x + y * y + z * z <= STAR_RADIUS * STAR_RADIUS) return [x, y, z];
+        }
+      };
+      for (let i = 0; i < STAR_COUNT; i++) {
+        const [x, y, z] = randInSphere();
+        starPositions[i * 3 + 0] = x;
+        starPositions[i * 3 + 1] = y;
+        starPositions[i * 3 + 2] = z;
+      }
+      const starsGeo = new THREE.BufferGeometry();
+      starsGeo.setAttribute("position", new THREE.BufferAttribute(starPositions, 3));
+      const starsMat = new THREE.PointsMaterial({
+        color: 0xffffff,
+        size: 1.2,
+        sizeAttenuation: true,
+        transparent: true,
+        opacity: 0.85,
+      });
+      const stars = new THREE.Points(starsGeo, starsMat);
+      scene.add(stars);
+
+      // Add a few drifting "asteroids" just for depth
+      const asteroids = [];
+      const AST_COUNT = 80;
+      const astGeo = new THREE.IcosahedronGeometry(1, 0);
+      for (let i = 0; i < AST_COUNT; i++) {
+        const m = new THREE.MeshBasicMaterial({ color: 0x88aaff, transparent: true, opacity: 0.22, wireframe: true });
+        const a = new THREE.Mesh(astGeo, m);
+        a.scale.setScalar(2 + Math.random() * 10);
+        const [x, y, z] = randInSphere();
+        a.position.set(x * 1.4, y * 1.4, z * 1.4);
+        a.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+        a.userData.spin = new THREE.Vector3(
+          (Math.random() * 2 - 1) * 0.15,
+          (Math.random() * 2 - 1) * 0.15,
+          (Math.random() * 2 - 1) * 0.15
+        );
+        asteroids.push(a);
+        scene.add(a);
+      }
+
+      const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+      const deadzone = (v, dz = 0.08) => {
+        if (Math.abs(v) < dz) return 0;
+        const s = Math.sign(v);
+        const t = (Math.abs(v) - dz) / (1 - dz);
+        return s * clamp(t, 0, 1);
+      };
+
+      // Input state
+      const keys = new Set();
+      let mouseLocked = false;
+      let yaw = 0;
+      let pitch = 0;
+
+      const velocity = new THREE.Vector3();
+      const tmpVec = new THREE.Vector3();
+      const tmpQuat = new THREE.Quaternion();
+
+      const resetPlayer = () => {
+        player.position.set(0, 0, 0);
+        velocity.set(0, 0, 0);
+        yaw = 0;
+        pitch = 0;
+        toast("Reset");
+      };
+
+      const toggleHelp = () => {
+        const isHidden = controlsEl.style.display === "none";
+        controlsEl.style.display = isHidden ? "block" : "none";
+        toast(isHidden ? "Help shown" : "Help hidden");
+      };
+
+      window.addEventListener("keydown", (e) => {
+        keys.add(e.code);
+        if (e.code === "KeyH") toggleHelp();
+        if (e.code === "KeyR") resetPlayer();
+        if (e.code === "Escape") {
+          if (document.pointerLockElement) document.exitPointerLock();
+        }
+      });
+      window.addEventListener("keyup", (e) => keys.delete(e.code));
+
+      const requestMouseLock = () => renderer.domElement.requestPointerLock?.();
+      btnLock.addEventListener("click", requestMouseLock);
+      renderer.domElement.addEventListener("click", requestMouseLock);
+
+      document.addEventListener("pointerlockchange", () => {
+        mouseLocked = document.pointerLockElement === renderer.domElement;
+        toast(mouseLocked ? "Mouse locked" : "Mouse unlocked");
+      });
+
+      window.addEventListener("mousemove", (e) => {
+        if (!mouseLocked) return;
+        const mx = e.movementX || 0;
+        const my = e.movementY || 0;
+        const sens = 0.0022;
+        yaw -= mx * sens;
+        pitch -= my * sens;
+        pitch = clamp(pitch, -1.45, 1.45);
+      });
+
+      btnFullscreen.addEventListener("click", async () => {
+        try {
+          if (!document.fullscreenElement) {
+            await document.documentElement.requestFullscreen();
+            toast("Fullscreen");
+          } else {
+            await document.exitFullscreen();
+            toast("Exit fullscreen");
+          }
+        } catch {
+          toast("Fullscreen not available");
+        }
+      });
+
+      // Gamepad helpers
+      let activePadIndex = null;
+      const padName = (gp) => (gp?.id ? gp.id.split("(")[0].trim() : "Gamepad");
+
+      window.addEventListener("gamepadconnected", (e) => {
+        activePadIndex = e.gamepad.index;
+        toast(`Gamepad connected: ${padName(e.gamepad)}`);
+      });
+      window.addEventListener("gamepaddisconnected", (e) => {
+        if (activePadIndex === e.gamepad.index) activePadIndex = null;
+        toast("Gamepad disconnected");
+      });
+
+      const getActiveGamepad = () => {
+        const pads = navigator.getGamepads?.() || [];
+        if (activePadIndex != null && pads[activePadIndex]) return pads[activePadIndex];
+        // otherwise pick first with any buttons pressed or axes moved
+        for (const gp of pads) {
+          if (!gp) continue;
+          const anyPressed = gp.buttons?.some((b) => b.pressed || b.value > 0.5);
+          const anyMoved = gp.axes?.some((a) => Math.abs(a) > 0.2);
+          if (anyPressed || anyMoved) {
+            activePadIndex = gp.index;
+            return gp;
+          }
+        }
+        return null;
+      };
+
+      // Rising-edge detection for gamepad buttons
+      const prevButtons = new Map();
+      const btnPressed = (gp, idx) => {
+        const prev = prevButtons.get(idx) || 0;
+        const cur = gp.buttons?.[idx]?.pressed ? 1 : 0;
+        prevButtons.set(idx, cur);
+        return cur === 1 && prev === 0;
+      };
+
+      const wrapAround = (obj, center, radius) => {
+        // Wrap each axis into a cube for cheap "infinite" effect
+        const r = radius;
+        const p = obj.position;
+        if (p.x - center.x > r) p.x -= 2 * r;
+        if (p.x - center.x < -r) p.x += 2 * r;
+        if (p.y - center.y > r) p.y -= 2 * r;
+        if (p.y - center.y < -r) p.y += 2 * r;
+        if (p.z - center.z > r) p.z -= 2 * r;
+        if (p.z - center.z < -r) p.z += 2 * r;
+      };
+
+      const clock = new THREE.Clock();
+      statusEl.textContent = "Running";
+
+      function animate() {
+        requestAnimationFrame(animate);
+        const dt = Math.min(0.05, clock.getDelta());
+
+        // Resolve input
+        const gp = getActiveGamepad();
+        const usingPad = !!gp;
+        inputEl.textContent = usingPad ? `Controller (${padName(gp)})` : mouseLocked ? "Keyboard+Mouse (locked)" : "Keyboard+Mouse";
+
+        // Look input
+        let lookX = 0;
+        let lookY = 0;
+
+        // Move input in local space
+        let moveX = 0;
+        let moveZ = 0;
+        let moveY = 0;
+        let thrust = 0;
+        let boost = 0;
+
+        if (usingPad) {
+          // Standard mapping: axes[0]=LS X, axes[1]=LS Y, axes[2]=RS X, axes[3]=RS Y
+          moveX = deadzone(gp.axes?.[0] ?? 0);
+          moveZ = deadzone(gp.axes?.[1] ?? 0);
+          lookX = deadzone(gp.axes?.[2] ?? 0, 0.07);
+          lookY = deadzone(gp.axes?.[3] ?? 0, 0.07);
+
+          const r2 = gp.buttons?.[7]?.value ?? 0; // R2
+          const l2 = gp.buttons?.[6]?.value ?? 0; // L2
+          thrust = clamp(r2 - l2, -1, 1);
+
+          const xBtn = gp.buttons?.[0]?.pressed; // Cross
+          const oBtn = gp.buttons?.[1]?.pressed; // Circle
+          moveY = (xBtn ? 1 : 0) + (oBtn ? -1 : 0);
+
+          boost = gp.buttons?.[2]?.pressed ? 1 : 0; // Square
+
+          if (btnPressed(gp, 3)) resetPlayer(); // Triangle
+          if (btnPressed(gp, 9)) toggleHelp(); // Options
+        } else {
+          // Keyboard
+          const k = (c) => keys.has(c);
+          moveX = (k("KeyD") ? 1 : 0) + (k("KeyA") ? -1 : 0);
+          moveZ = (k("KeyS") ? 1 : 0) + (k("KeyW") ? -1 : 0);
+          moveY = (k("Space") ? 1 : 0) + (k("ShiftLeft") || k("ShiftRight") ? -1 : 0);
+          thrust = (k("ArrowUp") ? 1 : 0) + (k("ArrowDown") ? -1 : 0);
+          boost = k("ControlLeft") || k("ControlRight") ? 1 : 0;
+
+          // Right stick equivalent via arrow keys (optional)
+          lookX = (k("ArrowRight") ? 1 : 0) + (k("ArrowLeft") ? -1 : 0);
+          lookY = (k("KeyK") ? 1 : 0) + (k("KeyI") ? -1 : 0);
+        }
+
+        // Apply look
+        const lookSpeed = usingPad ? 2.1 : 1.5;
+        yaw -= lookX * lookSpeed * dt;
+        pitch -= lookY * lookSpeed * dt;
+        pitch = clamp(pitch, -1.45, 1.45);
+
+        yawNode.rotation.y = yaw;
+        pitchNode.rotation.x = pitch;
+
+        // Build desired acceleration in local space
+        const boostMul = boost ? 2.2 : 1.0;
+        const accel = 26.0 * boostMul;
+        const strafe = 18.0 * boostMul;
+        const lift = 16.0 * boostMul;
+
+        // Local direction vectors from yaw/pitch (but keep strafe flat-ish on yaw)
+        tmpQuat.setFromEuler(new THREE.Euler(0, yaw, 0, "YXZ"));
+
+        // forward/back from yaw+pitch
+        const fwdQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(pitch, yaw, 0, "YXZ"));
+        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(fwdQuat);
+        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(tmpQuat);
+        const up = new THREE.Vector3(0, 1, 0);
+
+        const ax = right.multiplyScalar(moveX * strafe);
+        const az = forward.multiplyScalar((thrust - moveZ) * accel);
+        const ay = up.multiplyScalar(moveY * lift);
+
+        tmpVec.copy(ax).add(az).add(ay);
+
+        // Integrate velocity with damping
+        velocity.addScaledVector(tmpVec, dt);
+        const damping = usingPad ? 0.06 : 0.08;
+        velocity.multiplyScalar(Math.pow(1 - damping, dt * 60));
+
+        // Soft speed cap
+        const maxSpeed = 240 * boostMul;
+        const spd = velocity.length();
+        if (spd > maxSpeed) velocity.multiplyScalar(maxSpeed / spd);
+
+        player.position.addScaledVector(velocity, dt);
+
+        // Wrap stars/asteroids around player to feel infinite
+        stars.position.copy(player.position);
+        for (const a of asteroids) {
+          a.rotation.x += a.userData.spin.x * dt;
+          a.rotation.y += a.userData.spin.y * dt;
+          a.rotation.z += a.userData.spin.z * dt;
+          wrapAround(a, player.position, STAR_RADIUS * 2.1);
+        }
+
+        // HUD
+        speedEl.textContent = spd.toFixed(1);
+        posEl.textContent = `${player.position.x.toFixed(1)},${player.position.y.toFixed(1)},${player.position.z.toFixed(1)}`;
+
+        renderer.render(scene, camera);
+      }
+
+      window.addEventListener("resize", () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+
+      // Initial hint
+      toast("Click to lock mouse • Plug in PS5 controller and press any button", 2200);
+      animate();
+    </script>
+  </body>
 </html>
