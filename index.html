@@ -14,50 +14,6 @@
   <body>
     <div id="app">
       <canvas id="c" aria-label="3D space scene"></canvas>
-
-      <div id="overlay" class="overlay" aria-live="polite">
-        <div class="panel">
-          <div class="panel-title">Space Gyro</div>
-
-          <div class="row">
-            <button id="btnEnableMotion" type="button" class="btn primary">
-              Enable Motion
-            </button>
-          </div>
-
-          <div class="row">
-            <div class="status">
-              <div class="status-line">
-                <span class="k">MOTION</span>
-                <span class="v" id="motionStatus">OFF</span>
-              </div>
-              <div class="status-line">
-                <span class="k">TOUCH</span>
-                <span class="v" id="touchStatus">ON</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="row two">
-            <button id="btnRecenter" type="button" class="btn">
-              Recenter
-            </button>
-            <button id="btnHaptics" type="button" class="btn">
-              Haptics Test
-            </button>
-          </div>
-
-          <div class="row">
-            <div class="hint">
-              On iPhone Safari, web haptics are limited; vibration may not work.
-            </div>
-          </div>
-
-          <div class="row">
-            <pre id="debug" class="debug">α: —  β: —  γ: —</pre>
-          </div>
-        </div>
-      </div>
     </div>
 
     <script type="module" src="/src/main.js"></script>
