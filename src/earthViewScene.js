@@ -57,6 +57,31 @@ function fbm2D(x, y) {
   return f;
 }
 
+function createSoftDotTexture() {
+  const size = 128;
+  const cnv = document.createElement('canvas');
+  cnv.width = size;
+  cnv.height = size;
+  const ctx = cnv.getContext('2d');
+  if (!ctx) return null;
+
+  const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  // Soft, slightly "bloomy" dot: bright center, smooth falloff.
+  g.addColorStop(0.0, 'rgba(255,255,255,1.0)');
+  g.addColorStop(0.18, 'rgba(255,255,255,0.75)');
+  g.addColorStop(0.5, 'rgba(255,255,255,0.20)');
+  g.addColorStop(1.0, 'rgba(255,255,255,0.00)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, size, size);
+
+  const t = new THREE.CanvasTexture(cnv);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.minFilter = THREE.LinearFilter;
+  t.magFilter = THREE.LinearFilter;
+  t.needsUpdate = true;
+  return t;
+}
+
 /**
  * Build a decent-looking Earth fallback when the glTF is missing.
  * @param {import('three').WebGLRenderer} renderer
@@ -260,6 +285,19 @@ function createEarthFallback(renderer) {
   atmosphere.renderOrder = 3;
   group.add(atmosphere);
 
+  // Subtle soft white glow (requested) on top of the blue atmosphere.
+  const whiteGlowGeo = new THREE.SphereGeometry(R * 1.028, 96, 96);
+  const whiteGlowMat = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0.045,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  const whiteGlow = new THREE.Mesh(whiteGlowGeo, whiteGlowMat);
+  whiteGlow.renderOrder = 4;
+  group.add(whiteGlow);
+
   return { group, earthMesh, cloudsMesh };
 }
 
@@ -321,18 +359,36 @@ export function createEarthViewScene(renderer, opts = {}) {
 
   const starGeo = new THREE.BufferGeometry();
   starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
-  const starMat = new THREE.PointsMaterial({
+  const softDot = createSoftDotTexture();
+
+  // Two-layer stars: crisp core + larger additive halo for soft glow.
+  const starCoreMat = new THREE.PointsMaterial({
     color: 0xffffff,
-    size: 1.25,
+    size: 1.05,
     sizeAttenuation: false, // looks more "infinite"
+    map: softDot || null,
     transparent: true,
-    opacity: 0.95,
+    opacity: 0.92,
     depthWrite: false,
+    blending: THREE.NormalBlending,
   });
-  const stars = new THREE.Points(starGeo, starMat);
-  stars.frustumCulled = false;
+  const starGlowMat = new THREE.PointsMaterial({
+    color: 0xffffff,
+    size: 2.35,
+    sizeAttenuation: false,
+    map: softDot || null,
+    transparent: true,
+    opacity: 0.18,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+
+  const starsCore = new THREE.Points(starGeo, starCoreMat);
+  const starsGlow = new THREE.Points(starGeo, starGlowMat);
+  starsCore.frustumCulled = false;
+  starsGlow.frustumCulled = false;
   const voidGroup = new THREE.Group();
-  voidGroup.add(stars);
+  voidGroup.add(starsGlow, starsCore);
   scene.add(voidGroup);
 
   // Fallback Earth (visible if the model is missing)
@@ -356,6 +412,8 @@ export function createEarthViewScene(renderer, opts = {}) {
   const loader = new GLTFLoader();
   /** @type {THREE.Object3D | null} */
   let modelRoot = null;
+  /** @type {THREE.Mesh | null} */
+  let modelGlow = null;
 
   /**
    * Center the object at origin (keeps the model visually centered).
@@ -398,6 +456,30 @@ export function createEarthViewScene(renderer, opts = {}) {
       scene.add(modelRoot);
       const { size } = centerObjectAtOrigin(modelRoot);
       frameSizeAtOrigin(Math.max(1, size));
+
+      // Add a subtle soft white glow shell around the centered model.
+      // (Sized from the model's bounding sphere; works for arbitrary glTFs.)
+      if (modelGlow) {
+        modelGlow.removeFromParent();
+        modelGlow.geometry?.dispose?.();
+        modelGlow.material?.dispose?.();
+        modelGlow = null;
+      }
+      const box = new THREE.Box3().setFromObject(modelRoot);
+      const sphere = new THREE.Sphere();
+      box.getBoundingSphere(sphere);
+      const r = Math.max(0.001, sphere.radius);
+      const glowGeo = new THREE.SphereGeometry(r * 1.06, 80, 80);
+      const glowMat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.05,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      modelGlow = new THREE.Mesh(glowGeo, glowMat);
+      modelGlow.renderOrder = 10;
+      modelRoot.add(modelGlow);
     },
     undefined,
     (err) => {
@@ -472,6 +554,8 @@ export function createEarthViewScene(renderer, opts = {}) {
     setActive,
     onUserGesture,
     useMotion: false,
+    // Let the app hide the HUD by default on this view.
+    defaultUiHidden: true,
     modelUrl,
     musicUrl,
   };
