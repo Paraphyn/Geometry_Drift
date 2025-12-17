@@ -19,6 +19,7 @@ import { createGltfModelViewScene } from './gltfModelViewScene.js';
 import { createEarthViewScene } from './earthViewScene.js';
 import { createMotionController } from './motion.js';
 import { createRenderer } from './renderer.js';
+import { createSoundController } from './soundController.js';
 
 // ----------------------------
 // DOM
@@ -34,6 +35,7 @@ const hud = /** @type {HTMLDivElement} */ (document.getElementById('hud'));
 // ----------------------------
 const { renderer } = createRenderer(canvas);
 const motion = createMotionController(canvas);
+const sounds = createSoundController({ volume: 0.8 });
 
 // ----------------------------
 // Scenes (Views)
@@ -72,6 +74,7 @@ function setView(idx) {
   viewIdx = (idx + views.length) % views.length;
   activeView = views[viewIdx];
   sceneLabel.textContent = activeView.name;
+  sounds.trigger('view:change');
 
   const useMotion = activeView.useMotion !== false;
   motion.setActive(useMotion);
@@ -89,6 +92,7 @@ function setView(idx) {
 prevBtn?.addEventListener(
   'click',
   () => {
+    sounds.trigger('ui:prev');
     setView(viewIdx - 1);
   },
   { passive: true },
@@ -97,6 +101,7 @@ prevBtn?.addEventListener(
 nextBtn?.addEventListener(
   'click',
   () => {
+    sounds.trigger('ui:next');
     setView(viewIdx + 1);
   },
   { passive: true },
@@ -112,6 +117,7 @@ window.addEventListener(
     e.preventDefault();
     uiEverToggledByUser = true;
     applyUiHidden(!document.body.classList.contains('ui-hidden'));
+    sounds.trigger('ui:toggleHud');
   },
   { passive: false },
 );
@@ -121,12 +127,16 @@ let triedMotion = false;
 canvas.addEventListener(
   'pointerdown',
   async () => {
+    await sounds.onUserGesture();
     activeView?.onUserGesture?.();
     if (triedMotion) return;
     if (activeView.useMotion === false) return;
     triedMotion = true;
     const ok = await motion.enableMotionFromUserGesture();
-    if (ok) motion.recenter();
+    if (ok) {
+      motion.recenter();
+      sounds.trigger('motion:enabled');
+    }
   },
   { passive: true },
 );
