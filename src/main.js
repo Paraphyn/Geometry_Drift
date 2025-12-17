@@ -15,6 +15,7 @@ import './style.css';
 import { createPulsarViewScene } from './scene.js';
 import { createBlackHoleViewScene } from './blackHoleViewScene.js';
 import { createBlackHole2ViewScene } from './blackHole2ViewScene.js';
+import { createGltfModelViewScene } from './gltfModelViewScene.js';
 import { createMotionController } from './motion.js';
 import { createRenderer } from './renderer.js';
 
@@ -35,7 +36,7 @@ const motion = createMotionController(canvas);
 // ----------------------------
 // Scenes (Views)
 // ----------------------------
-/** @typedef {{name: string, scene: any, camera: any, update: (dt:number)=>void, resize: (w:number,h:number,dpr:number)=>void, render?: (tMs:number)=>void}} View */
+/** @typedef {{name: string, scene: any, camera: any, update: (dt:number)=>void, resize: (w:number,h:number,dpr:number)=>void, render?: (tMs:number)=>void, setActive?: (isActive:boolean)=>void, useMotion?: boolean}} View */
 
 /** @type {View} */
 const blackHoleView = createBlackHoleViewScene(renderer);
@@ -43,19 +44,28 @@ const blackHoleView = createBlackHoleViewScene(renderer);
 const pulsarView = createPulsarViewScene(renderer);
 /** @type {View} */
 const blackHole2View = createBlackHole2ViewScene(renderer);
+/** @type {View} */
+const gltfModelView = createGltfModelViewScene(renderer, { modelUrl: '/models/example.glb' });
 
 /** @type {View[]} */
-const views = [blackHoleView, pulsarView, blackHole2View];
+const views = [gltfModelView, blackHoleView, pulsarView, blackHole2View];
 
-let viewIdx = 0; // default: Black Hole View Scene
+let viewIdx = 0; // default: glTF Model
 /** @type {View} */
 let activeView = views[viewIdx];
 sceneLabel.textContent = activeView.name;
 
 function setView(idx) {
+  activeView?.setActive?.(false);
+
   viewIdx = (idx + views.length) % views.length;
   activeView = views[viewIdx];
   sceneLabel.textContent = activeView.name;
+
+  const useMotion = activeView.useMotion !== false;
+  motion.setActive(useMotion);
+  activeView?.setActive?.(true);
+
   onResize();
 }
 
@@ -81,6 +91,7 @@ canvas.addEventListener(
   'pointerdown',
   async () => {
     if (triedMotion) return;
+    if (activeView.useMotion === false) return;
     triedMotion = true;
     const ok = await motion.enableMotionFromUserGesture();
     if (ok) motion.recenter();
@@ -107,8 +118,11 @@ function frame(now) {
   const dt = Math.min(0.05, (now - lastT) / 1000);
   lastT = now;
 
-  motion.update(dt);
-  if (activeView.camera) motion.applyToCamera(activeView.camera);
+  const useMotion = activeView.useMotion !== false;
+  if (useMotion) {
+    motion.update(dt);
+    if (activeView.camera) motion.applyToCamera(activeView.camera);
+  }
 
   activeView.update(dt);
   if (activeView.render) {
@@ -121,3 +135,6 @@ function frame(now) {
   }
 }
 requestAnimationFrame(frame);
+
+// Ensure per-view activation state is set on load
+setView(viewIdx);

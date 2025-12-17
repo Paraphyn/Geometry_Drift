@@ -13,6 +13,9 @@ const lerp = (a, b, t) => a + (b - a) * t;
  * @param {HTMLCanvasElement} canvas
  */
 export function createMotionController(canvas) {
+  // Allow the app to disable motion/touch handling for certain views (e.g. OrbitControls scenes)
+  let active = true;
+
   // Raw sensor (degrees)
   /** @type {{alpha: number|null, beta: number|null, gamma: number|null}} */
   const sensor = { alpha: null, beta: null, gamma: null };
@@ -46,6 +49,7 @@ export function createMotionController(canvas) {
   const pointer = { down: false, id: -1, x: 0, y: 0 };
 
   function onPointerDown(e) {
+    if (!active) return;
     if (motionEnabled) return; // touch fallback only when motion is OFF
     pointer.down = true;
     pointer.id = e.pointerId;
@@ -55,6 +59,7 @@ export function createMotionController(canvas) {
   }
 
   function onPointerMove(e) {
+    if (!active) return;
     if (motionEnabled) return;
     if (!pointer.down || e.pointerId !== pointer.id) return;
     const dx = e.clientX - pointer.x;
@@ -69,6 +74,7 @@ export function createMotionController(canvas) {
   }
 
   function onPointerUp(e) {
+    if (!active) return;
     if (e.pointerId !== pointer.id) return;
     pointer.down = false;
     pointer.id = -1;
@@ -80,6 +86,7 @@ export function createMotionController(canvas) {
   canvas.addEventListener('pointercancel', onPointerUp, { passive: true });
 
   function onDeviceOrientation(ev) {
+    if (!active) return;
     // Degrees, may be null
     sensor.alpha = typeof ev.alpha === 'number' ? ev.alpha : null;
     sensor.beta = typeof ev.beta === 'number' ? ev.beta : null;
@@ -113,6 +120,7 @@ export function createMotionController(canvas) {
    * @returns {Promise<boolean>}
    */
   async function enableMotionFromUserGesture() {
+    if (!active) return false;
     if (motionEnabled) return true;
 
     // If there's no event support at all, fail fast.
@@ -148,6 +156,7 @@ export function createMotionController(canvas) {
   }
 
   function recenter() {
+    if (!active) return;
     if (sensor.beta != null && sensor.gamma != null) {
       neutral = { beta: sensor.beta, gamma: sensor.gamma };
       hasNeutral = true;
@@ -164,6 +173,7 @@ export function createMotionController(canvas) {
    * @param {number} dt
    */
   function update(dt) {
+    if (!active) return;
     // Frame-rate independent-ish smoothing
     const smooth = clamp(1 - Math.pow(0.001, dt), 0, 1);
 
@@ -183,11 +193,24 @@ export function createMotionController(canvas) {
    * @param {{rotation: {order: string, x: number, y: number, z: number}}} camera
    */
   function applyToCamera(camera) {
+    if (!active) return;
     // Use an order that avoids gimbal issues for yaw/pitch.
     camera.rotation.order = 'YXZ';
     camera.rotation.y = yaw;
     camera.rotation.x = pitch;
     camera.rotation.z = 0;
+  }
+
+  /**
+   * Enable/disable motion + touch look handling. Useful for views that provide their own controls.
+   * @param {boolean} isActive
+   */
+  function setActive(isActive) {
+    active = !!isActive;
+    if (!active) {
+      pointer.down = false;
+      pointer.id = -1;
+    }
   }
 
   function getStatus() {
@@ -202,6 +225,7 @@ export function createMotionController(canvas) {
   }
 
   return {
+    setActive,
     enableMotionFromUserGesture,
     recenter,
     update,
