@@ -16,6 +16,7 @@ import { createPulsarViewScene } from './scene.js';
 import { createBlackHoleViewScene } from './blackHoleViewScene.js';
 import { createBlackHole2ViewScene } from './blackHole2ViewScene.js';
 import { createGltfModelViewScene } from './gltfModelViewScene.js';
+import { createEarthViewScene } from './earthViewScene.js';
 import { createMotionController } from './motion.js';
 import { createRenderer } from './renderer.js';
 
@@ -36,7 +37,7 @@ const motion = createMotionController(canvas);
 // ----------------------------
 // Scenes (Views)
 // ----------------------------
-/** @typedef {{name: string, scene: any, camera: any, update: (dt:number)=>void, resize: (w:number,h:number,dpr:number)=>void, render?: (tMs:number)=>void, setActive?: (isActive:boolean)=>void, useMotion?: boolean}} View */
+/** @typedef {{name: string, scene: any, camera: any, update: (dt:number)=>void, resize: (w:number,h:number,dpr:number)=>void, render?: (tMs:number)=>void, setActive?: (isActive:boolean)=>void, onUserGesture?: ()=>void, useMotion?: boolean}} View */
 
 /** @type {View} */
 const blackHoleView = createBlackHoleViewScene(renderer);
@@ -46,11 +47,13 @@ const pulsarView = createPulsarViewScene(renderer);
 const blackHole2View = createBlackHole2ViewScene(renderer);
 /** @type {View} */
 const gltfModelView = createGltfModelViewScene(renderer, { modelUrl: '/models/scene.gltf' });
+/** @type {View} */
+const earthView = createEarthViewScene(renderer, { modelUrl: '/models/earth/scene.gltf', musicUrl: '/Music/earth_background.mp3' });
 
 /** @type {View[]} */
-const views = [gltfModelView, blackHoleView, pulsarView, blackHole2View];
+const views = [earthView, gltfModelView, blackHoleView, pulsarView, blackHole2View];
 
-let viewIdx = 0; // default: glTF Model
+let viewIdx = 0; // default: Earth
 /** @type {View} */
 let activeView = views[viewIdx];
 sceneLabel.textContent = activeView.name;
@@ -90,6 +93,7 @@ let triedMotion = false;
 canvas.addEventListener(
   'pointerdown',
   async () => {
+    activeView?.onUserGesture?.();
     if (triedMotion) return;
     if (activeView.useMotion === false) return;
     triedMotion = true;
