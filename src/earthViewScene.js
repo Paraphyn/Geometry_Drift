@@ -285,19 +285,6 @@ function createEarthFallback(renderer) {
   atmosphere.renderOrder = 3;
   group.add(atmosphere);
 
-  // Subtle soft white glow (requested) on top of the blue atmosphere.
-  const whiteGlowGeo = new THREE.SphereGeometry(R * 1.028, 96, 96);
-  const whiteGlowMat = new THREE.MeshBasicMaterial({
-    color: 0xffffff,
-    transparent: true,
-    opacity: 0.045,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
-  });
-  const whiteGlow = new THREE.Mesh(whiteGlowGeo, whiteGlowMat);
-  whiteGlow.renderOrder = 4;
-  group.add(whiteGlow);
-
   return { group, earthMesh, cloudsMesh };
 }
 
@@ -412,8 +399,6 @@ export function createEarthViewScene(renderer, opts = {}) {
   const loader = new GLTFLoader();
   /** @type {THREE.Object3D | null} */
   let modelRoot = null;
-  /** @type {THREE.Mesh | null} */
-  let modelGlow = null;
 
   /**
    * Center the object at origin (keeps the model visually centered).
@@ -456,30 +441,6 @@ export function createEarthViewScene(renderer, opts = {}) {
       scene.add(modelRoot);
       const { size } = centerObjectAtOrigin(modelRoot);
       frameSizeAtOrigin(Math.max(1, size));
-
-      // Add a subtle soft white glow shell around the centered model.
-      // (Sized from the model's bounding sphere; works for arbitrary glTFs.)
-      if (modelGlow) {
-        modelGlow.removeFromParent();
-        modelGlow.geometry?.dispose?.();
-        modelGlow.material?.dispose?.();
-        modelGlow = null;
-      }
-      const box = new THREE.Box3().setFromObject(modelRoot);
-      const sphere = new THREE.Sphere();
-      box.getBoundingSphere(sphere);
-      const r = Math.max(0.001, sphere.radius);
-      const glowGeo = new THREE.SphereGeometry(r * 1.06, 80, 80);
-      const glowMat = new THREE.MeshBasicMaterial({
-        color: 0xffffff,
-        transparent: true,
-        opacity: 0.05,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-      });
-      modelGlow = new THREE.Mesh(glowGeo, glowMat);
-      modelGlow.renderOrder = 10;
-      modelRoot.add(modelGlow);
     },
     undefined,
     (err) => {
