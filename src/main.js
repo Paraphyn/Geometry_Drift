@@ -12,19 +12,65 @@
  */
 
 import './style.css';
-import { createScene } from './scene.js';
+import { createPulsarViewScene } from './scene.js';
+import { createBlackHoleViewScene } from './blackHoleViewScene.js';
 import { createMotionController } from './motion.js';
+import { createRenderer } from './renderer.js';
 
 // ----------------------------
 // DOM
 // ----------------------------
 const canvas = /** @type {HTMLCanvasElement} */ (document.getElementById('c'));
+const sceneLabel = /** @type {HTMLDivElement} */ (document.getElementById('sceneLabel'));
+const prevBtn = /** @type {HTMLButtonElement} */ (document.getElementById('prevBtn'));
+const nextBtn = /** @type {HTMLButtonElement} */ (document.getElementById('nextBtn'));
 
 // ----------------------------
 // Modules
 // ----------------------------
-const space = createScene(canvas);
+const { renderer } = createRenderer(canvas);
 const motion = createMotionController(canvas);
+
+// ----------------------------
+// Scenes (Views)
+// ----------------------------
+/** @typedef {{name: string, scene: import('three').Scene, camera: import('three').PerspectiveCamera, update: (dt:number)=>void, resize: (w:number,h:number,dpr:number)=>void, render?: (tMs:number)=>void}} View */
+
+/** @type {View} */
+const blackHoleView = createBlackHoleViewScene(renderer);
+/** @type {View} */
+const pulsarView = createPulsarViewScene(renderer);
+
+/** @type {View[]} */
+const views = [blackHoleView, pulsarView];
+
+let viewIdx = 0; // default: Black Hole View Scene
+/** @type {View} */
+let activeView = views[viewIdx];
+sceneLabel.textContent = activeView.name;
+
+function setView(idx) {
+  viewIdx = (idx + views.length) % views.length;
+  activeView = views[viewIdx];
+  sceneLabel.textContent = activeView.name;
+  onResize();
+}
+
+prevBtn?.addEventListener(
+  'click',
+  () => {
+    setView(viewIdx - 1);
+  },
+  { passive: true },
+);
+
+nextBtn?.addEventListener(
+  'click',
+  () => {
+    setView(viewIdx + 1);
+  },
+  { passive: true },
+);
 
 // No UI overlay: use the first canvas gesture to request motion permission (iOS Safari requirement).
 let triedMotion = false;
@@ -43,7 +89,7 @@ canvas.addEventListener(
 // Resize/orientation
 // ----------------------------
 function onResize() {
-  space.resize(window.innerWidth, window.innerHeight, window.devicePixelRatio || 1);
+  activeView.resize(window.innerWidth, window.innerHeight, window.devicePixelRatio || 1);
 }
 window.addEventListener('resize', onResize, { passive: true });
 window.addEventListener('orientationchange', onResize, { passive: true });
@@ -59,9 +105,13 @@ function frame(now) {
   lastT = now;
 
   motion.update(dt);
-  motion.applyToCamera(space.camera);
+  motion.applyToCamera(activeView.camera);
 
-  space.update(dt);
-  space.renderer.render(space.scene, space.camera);
+  activeView.update(dt);
+  if (activeView.render) {
+    activeView.render(now);
+  } else {
+    renderer.render(activeView.scene, activeView.camera);
+  }
 }
 requestAnimationFrame(frame);

@@ -3,23 +3,16 @@ import * as THREE from 'three';
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
 /**
- * Creates a simple "space" scene:
+ * Pulsar View Scene:
+ * A simple "space" scene:
  * - starfield (Points)
  * - subtle fog
- * - ship indicator (small cone) fixed in front of the camera
+ * - centered pulsar indicator with fast pulsations (attached to camera)
  * - forward-movement illusion by moving stars toward the camera
  *
- * @param {HTMLCanvasElement} canvas
+ * @param {import('three').WebGLRenderer} renderer
  */
-export function createScene(canvas) {
-  const renderer = new THREE.WebGLRenderer({
-    canvas,
-    antialias: true,
-    alpha: false,
-    powerPreference: 'high-performance',
-  });
-  renderer.setClearColor(0x000008, 1);
-
+export function createPulsarViewScene(renderer) {
   const scene = new THREE.Scene();
   scene.fog = new THREE.FogExp2(0x000008, 0.018);
 
@@ -169,6 +162,9 @@ export function createScene(canvas) {
     geo.attributes.position.needsUpdate = true;
   }
 
-  return { renderer, scene, camera, update, resize };
+  return { name: 'Pulsar View Scene', scene, camera, update, resize };
 }
+
+// Backwards-compatible alias (older code may still import createScene)
+export const createScene = createPulsarViewScene;
 
