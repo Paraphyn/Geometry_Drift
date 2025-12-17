@@ -298,7 +298,9 @@ export function createEarthViewScene(renderer, opts = {}) {
   rim.position.set(-6, 2.5, -4);
   scene.add(rim);
 
-  // "Infinite" stars: attach to camera so they act like a skybox.
+  // "Infinite" stars (the "void"):
+  // Keep the starfield centered on the camera position, but NOT parented to the camera.
+  // This makes swipes/orbiting feel like you're moving space around the object.
   const STAR_COUNT = 9000;
   const STAR_RADIUS = 650;
   const starPositions = new Float32Array(STAR_COUNT * 3);
@@ -329,7 +331,9 @@ export function createEarthViewScene(renderer, opts = {}) {
   });
   const stars = new THREE.Points(starGeo, starMat);
   stars.frustumCulled = false;
-  camera.add(stars);
+  const voidGroup = new THREE.Group();
+  voidGroup.add(stars);
+  scene.add(voidGroup);
 
   // Fallback Earth (visible if the model is missing)
   const { group: fallbackEarth, earthMesh: fallbackEarthMesh, cloudsMesh: fallbackCloudsMesh } =
@@ -422,9 +426,14 @@ export function createEarthViewScene(renderer, opts = {}) {
 
   function update(_dt) {
     controls.update();
+    // Keep the "void" centered around the camera, but in world space (no camera parenting).
+    voidGroup.position.copy(camera.position);
     if (!modelRoot) {
       if (fallbackEarthMesh) fallbackEarthMesh.rotation.y += 0.10 * _dt;
       if (fallbackCloudsMesh) fallbackCloudsMesh.rotation.y += 0.14 * _dt;
+    } else {
+      // Gentle auto-rotation for the centered model.
+      modelRoot.rotation.y += 0.10 * _dt;
     }
   }
 
