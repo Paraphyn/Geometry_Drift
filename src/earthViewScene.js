@@ -399,9 +399,14 @@ export function createEarthViewScene(renderer, opts = {}) {
   const loader = new GLTFLoader();
   /** @type {THREE.Object3D | null} */
   let modelRoot = null;
+  // Pivot that stays at the origin. We rotate THIS so the model spins about its own center.
+  const modelPivot = new THREE.Group();
+  scene.add(modelPivot);
 
   /**
-   * Center the object at origin (keeps the model visually centered).
+   * Center the object in its parent so its bounds center is at (0,0,0).
+   * Note: this offsets `root.position` but keeps the parent (pivot) at the origin,
+   * so rotating the parent spins the model around its own axis (no "orbiting").
    * @param {THREE.Object3D} root
    */
   function centerObjectAtOrigin(root) {
@@ -411,7 +416,7 @@ export function createEarthViewScene(renderer, opts = {}) {
     const sizeV = new THREE.Vector3();
     box.getCenter(center);
     box.getSize(sizeV);
-    root.position.sub(center); // move so center becomes (0,0,0)
+    root.position.sub(center); // move so bounds center becomes (0,0,0) in the parent
     return { size: Math.max(sizeV.x, sizeV.y, sizeV.z), center };
   }
 
@@ -436,9 +441,11 @@ export function createEarthViewScene(renderer, opts = {}) {
     modelUrl,
     (gltf) => {
       scene.remove(fallbackEarth);
+      // Clear any previous model instance.
+      modelPivot.clear();
       modelRoot = gltf.scene || gltf.scenes?.[0] || null;
       if (!modelRoot) return;
-      scene.add(modelRoot);
+      modelPivot.add(modelRoot);
       const { size } = centerObjectAtOrigin(modelRoot);
       frameSizeAtOrigin(Math.max(1, size));
     },
@@ -448,6 +455,7 @@ export function createEarthViewScene(renderer, opts = {}) {
       // eslint-disable-next-line no-console
       console.warn(`[Earth] Failed to load model at ${modelUrl}. Using fallback Earth.`, err);
       modelRoot = null;
+      modelPivot.clear();
     },
   );
 
@@ -475,8 +483,8 @@ export function createEarthViewScene(renderer, opts = {}) {
       if (fallbackEarthMesh) fallbackEarthMesh.rotation.y += 0.10 * _dt;
       if (fallbackCloudsMesh) fallbackCloudsMesh.rotation.y += 0.14 * _dt;
     } else {
-      // Gentle auto-rotation for the centered model.
-      modelRoot.rotation.y += 0.10 * _dt;
+      // Gentle auto-rotation around the model's own center.
+      modelPivot.rotation.y += 0.10 * _dt;
     }
   }
 
