@@ -14,6 +14,7 @@
 import './style.css';
 import { createPulsarViewScene } from './scene.js';
 import { createBlackHoleViewScene } from './blackHoleViewScene.js';
+import { createBlackHole2ViewScene } from './blackHole2ViewScene.js';
 import { createMotionController } from './motion.js';
 import { createRenderer } from './renderer.js';
 
@@ -34,15 +35,17 @@ const motion = createMotionController(canvas);
 // ----------------------------
 // Scenes (Views)
 // ----------------------------
-/** @typedef {{name: string, scene: import('three').Scene, camera: import('three').PerspectiveCamera, update: (dt:number)=>void, resize: (w:number,h:number,dpr:number)=>void, render?: (tMs:number)=>void}} View */
+/** @typedef {{name: string, scene: any, camera: any, update: (dt:number)=>void, resize: (w:number,h:number,dpr:number)=>void, render?: (tMs:number)=>void}} View */
 
 /** @type {View} */
 const blackHoleView = createBlackHoleViewScene(renderer);
 /** @type {View} */
 const pulsarView = createPulsarViewScene(renderer);
+/** @type {View} */
+const blackHole2View = createBlackHole2ViewScene(renderer);
 
 /** @type {View[]} */
-const views = [blackHoleView, pulsarView];
+const views = [blackHoleView, pulsarView, blackHole2View];
 
 let viewIdx = 0; // default: Black Hole View Scene
 /** @type {View} */
@@ -105,12 +108,15 @@ function frame(now) {
   lastT = now;
 
   motion.update(dt);
-  motion.applyToCamera(activeView.camera);
+  if (activeView.camera) motion.applyToCamera(activeView.camera);
 
   activeView.update(dt);
   if (activeView.render) {
     activeView.render(now);
   } else {
+    // If the previous view used raw GL drawing, ensure Three re-syncs its internal state.
+    // (Calling resetState() is cheap and avoids subtle state leakage.)
+    renderer.resetState();
     renderer.render(activeView.scene, activeView.camera);
   }
 }
