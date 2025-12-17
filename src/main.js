@@ -27,6 +27,7 @@ const canvas = /** @type {HTMLCanvasElement} */ (document.getElementById('c'));
 const sceneLabel = /** @type {HTMLDivElement} */ (document.getElementById('sceneLabel'));
 const prevBtn = /** @type {HTMLButtonElement} */ (document.getElementById('prevBtn'));
 const nextBtn = /** @type {HTMLButtonElement} */ (document.getElementById('nextBtn'));
+const hud = /** @type {HTMLDivElement} */ (document.getElementById('hud'));
 
 // ----------------------------
 // Modules
@@ -86,6 +87,21 @@ nextBtn?.addEventListener(
     setView(viewIdx + 1);
   },
   { passive: true },
+);
+
+// ----------------------------
+// UI toggle (F8)
+// ----------------------------
+window.addEventListener(
+  'keydown',
+  (e) => {
+    if (e.code !== 'F8' && e.key !== 'F8') return;
+    e.preventDefault();
+    document.body.classList.toggle('ui-hidden');
+    const hidden = document.body.classList.contains('ui-hidden');
+    hud?.setAttribute('aria-hidden', hidden ? 'true' : 'false');
+  },
+  { passive: false },
 );
 
 // No UI overlay: use the first canvas gesture to request motion permission (iOS Safari requirement).
