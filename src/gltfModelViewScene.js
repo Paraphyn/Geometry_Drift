@@ -10,13 +10,13 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
  * - Lets the user orbit/pan/zoom the camera around the model
  *
  * Put models in: /public/models/
- * Default URL:   /models/example.glb
+ * Default URL:   /models/scene.gltf
  *
  * @param {import('three').WebGLRenderer} renderer
  * @param {{ modelUrl?: string }} [opts]
  */
 export function createGltfModelViewScene(renderer, opts = {}) {
-  const modelUrl = opts.modelUrl ?? '/models/example.glb';
+  const modelUrl = opts.modelUrl ?? '/models/scene.gltf';
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x05070d);

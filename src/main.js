@@ -45,7 +45,7 @@ const pulsarView = createPulsarViewScene(renderer);
 /** @type {View} */
 const blackHole2View = createBlackHole2ViewScene(renderer);
 /** @type {View} */
-const gltfModelView = createGltfModelViewScene(renderer, { modelUrl: '/models/example.glb' });
+const gltfModelView = createGltfModelViewScene(renderer, { modelUrl: '/models/scene.gltf' });
 
 /** @type {View[]} */
 const views = [gltfModelView, blackHoleView, pulsarView, blackHole2View];
