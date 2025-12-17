@@ -59,6 +59,13 @@ let viewIdx = 0; // default: Earth
 let activeView = views[viewIdx];
 sceneLabel.textContent = activeView.name;
 
+function applyUiHidden(hidden) {
+  document.body.classList.toggle('ui-hidden', hidden);
+  hud?.setAttribute('aria-hidden', hidden ? 'true' : 'false');
+}
+
+let uiEverToggledByUser = false;
+
 function setView(idx) {
   activeView?.setActive?.(false);
 
@@ -69,6 +76,12 @@ function setView(idx) {
   const useMotion = activeView.useMotion !== false;
   motion.setActive(useMotion);
   activeView?.setActive?.(true);
+
+  // Only apply per-view default UI visibility until the user explicitly toggles it.
+  if (!uiEverToggledByUser) {
+    // @ts-ignore - views may optionally expose a defaultUiHidden flag
+    applyUiHidden(!!activeView.defaultUiHidden);
+  }
 
   onResize();
 }
@@ -97,9 +110,8 @@ window.addEventListener(
   (e) => {
     if (e.code !== 'F8' && e.key !== 'F8') return;
     e.preventDefault();
-    document.body.classList.toggle('ui-hidden');
-    const hidden = document.body.classList.contains('ui-hidden');
-    hud?.setAttribute('aria-hidden', hidden ? 'true' : 'false');
+    uiEverToggledByUser = true;
+    applyUiHidden(!document.body.classList.contains('ui-hidden'));
   },
   { passive: false },
 );

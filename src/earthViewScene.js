@@ -472,6 +472,8 @@ export function createEarthViewScene(renderer, opts = {}) {
     setActive,
     onUserGesture,
     useMotion: false,
+    // Let the app hide the HUD by default on this view.
+    defaultUiHidden: true,
     modelUrl,
     musicUrl,
   };
