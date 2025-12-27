@@ -298,14 +298,14 @@ function createEarthFallback(renderer) {
  *
  * Expected assets:
  * - /public/models/earth/scene.gltf (+ referenced .bin/.png/etc)
- * - /public/Music/earth_background.mp3
+ * - /public/Music/Earth_Background.mp3
  *
  * @param {import('three').WebGLRenderer} renderer
  * @param {{ modelUrl?: string, musicUrl?: string }} [opts]
  */
 export function createEarthViewScene(renderer, opts = {}) {
   const modelUrl = opts.modelUrl ?? '/models/earth/scene.gltf';
-  const musicUrl = opts.musicUrl ?? '/Music/earth_background.mp3';
+  const musicUrl = opts.musicUrl ?? '/Music/Earth_Background.mp3';
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x000008);
