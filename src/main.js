@@ -38,6 +38,27 @@ const motion = createMotionController(canvas);
 const sounds = createSoundController({ volume: 0.8 });
 
 // ----------------------------
+// Launch background music (looped)
+// ----------------------------
+const launchBgm = new Audio('/sounds/Black_Hole_BG.wav');
+launchBgm.loop = true;
+launchBgm.preload = 'auto';
+launchBgm.volume = 0.6;
+let launchBgmTried = false;
+
+async function tryStartLaunchBgm() {
+  if (launchBgmTried) return;
+  launchBgmTried = true;
+  try {
+    await launchBgm.play();
+  } catch {
+    // Autoplay is often blocked until the first user gesture (mobile Safari/Chrome).
+    // We'll retry in the pointerdown handler below.
+    launchBgmTried = false;
+  }
+}
+
+// ----------------------------
 // Scenes (Views)
 // ----------------------------
 /** @typedef {{name: string, scene: any, camera: any, update: (dt:number)=>void, resize: (w:number,h:number,dpr:number)=>void, render?: (tMs:number)=>void, setActive?: (isActive:boolean)=>void, onUserGesture?: ()=>void, useMotion?: boolean}} View */
@@ -51,7 +72,10 @@ const blackHole2View = createBlackHole2ViewScene(renderer);
 /** @type {View} */
 const gltfModelView = createGltfModelViewScene(renderer, { modelUrl: '/models/scene.gltf' });
 /** @type {View} */
-const earthView = createEarthViewScene(renderer, { modelUrl: '/models/earth/scene.gltf', musicUrl: '/Music/earth_background.mp3' });
+const earthView = createEarthViewScene(renderer, {
+  modelUrl: '/models/earth/scene.gltf',
+  musicUrl: '/Music/Earth_Background.mp3',
+});
 
 /** @type {View[]} */
 const views = [earthView, gltfModelView, blackHoleView, pulsarView, blackHole2View];
@@ -128,6 +152,7 @@ canvas.addEventListener(
   'pointerdown',
   async () => {
     await sounds.onUserGesture();
+    void tryStartLaunchBgm();
     activeView?.onUserGesture?.();
     if (triedMotion) return;
     if (activeView.useMotion === false) return;
@@ -180,3 +205,6 @@ requestAnimationFrame(frame);
 
 // Ensure per-view activation state is set on load
 setView(viewIdx);
+
+// Best-effort attempt to start launch BGM immediately.
+void tryStartLaunchBgm();
