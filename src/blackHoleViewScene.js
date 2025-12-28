@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { createConstellationLayer } from './constellations.js';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
@@ -52,6 +53,17 @@ export function createBlackHoleViewScene(renderer) {
 
   const stars = new THREE.Points(geo, mat);
   scene.add(stars);
+
+  // Brighter constellation layer (real-ish sky placement via RA/Dec).
+  const constellations = createConstellationLayer({
+    radius: 220,
+    sizeCore: 0.28,
+    sizeGlow: 0.78,
+    sizeAttenuation: true,
+    fog: false,
+    showLines: true,
+  });
+  scene.add(constellations);
 
   // ----------------------------
   // Post (fullscreen black hole pass)

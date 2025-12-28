@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { createConstellationLayer } from './constellations.js';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
@@ -376,6 +377,17 @@ export function createEarthViewScene(renderer, opts = {}) {
   starsGlow.frustumCulled = false;
   const voidGroup = new THREE.Group();
   voidGroup.add(starsGlow, starsCore);
+
+  // Brighter constellation layer (real-ish sky placement via RA/Dec).
+  const constellations = createConstellationLayer({
+    radius: STAR_RADIUS,
+    sizeCore: 2.4,
+    sizeGlow: 6.4,
+    sizeAttenuation: false,
+    fog: false,
+    showLines: true,
+  });
+  voidGroup.add(constellations);
   scene.add(voidGroup);
 
   // Fallback Earth (visible if the model is missing)
