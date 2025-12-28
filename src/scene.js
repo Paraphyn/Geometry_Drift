@@ -79,7 +79,7 @@ export function createPulsarViewScene(renderer) {
     sizeGlow: 0.78,
     sizeAttenuation: true,
     fog: false,
-    showLines: true,
+    showLines: false,
   });
   scene.add(constellations);
 
