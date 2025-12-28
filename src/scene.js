@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { createConstellationLayer } from './constellations.js';
+import { createSunRig } from './sun.js';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
@@ -79,9 +80,15 @@ export function createPulsarViewScene(renderer) {
     sizeGlow: 0.78,
     sizeAttenuation: true,
     fog: false,
-    showLines: false,
   });
   scene.add(constellations);
+
+  // Distant sun (visible when looking off-axis).
+  const sun = createSunRig({
+    position: new THREE.Vector3(-230, 65, -105),
+    radius: 7,
+  });
+  scene.add(sun.object);
 
   function resize(w, h, dpr) {
     camera.aspect = w / h;
@@ -96,6 +103,8 @@ export function createPulsarViewScene(renderer) {
   let t = 0;
   function update(dt) {
     t += dt;
+    constellations.userData?.update?.(dt);
+    sun.update(dt, camera);
 
     const pos = geo.attributes.position.array;
     for (let i = 0; i < STAR_COUNT; i++) {
