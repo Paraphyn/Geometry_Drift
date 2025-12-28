@@ -158,11 +158,11 @@ const EDGES = [
  */
 export function createConstellationLayer(opts) {
   const radius = opts.radius;
-  const sizeCore = opts.sizeCore ?? 0.2;
-  const sizeGlow = opts.sizeGlow ?? sizeCore * 2.5;
+  const sizeCore = opts.sizeCore ?? 0.26;
+  const sizeGlow = opts.sizeGlow ?? sizeCore * 3.2;
   const sizeAttenuation = opts.sizeAttenuation ?? true;
   const fog = opts.fog ?? false;
-  const showLines = opts.showLines ?? true;
+  const showLines = opts.showLines ?? false;
 
   const group = new THREE.Group();
   group.name = 'ConstellationLayer';
@@ -183,7 +183,7 @@ export function createConstellationLayer(opts) {
 
     // Convert magnitude into a simple brightness factor (brighter star => larger factor).
     // Visual magnitudes here range roughly [-1..6]; we clamp to keep everything visible.
-    const b = clamp(1.15 - (s.mag / 5.5), 0.25, 1.1);
+    const b = clamp(1.65 - s.mag * 0.35, 0.55, 1.65);
     colors[j + 0] = b;
     colors[j + 1] = b;
     colors[j + 2] = b;
@@ -202,9 +202,9 @@ export function createConstellationLayer(opts) {
     sizeAttenuation,
     map: dot || null,
     transparent: true,
-    opacity: 0.98,
+    opacity: 1.0,
     depthWrite: false,
-    blending: THREE.NormalBlending,
+    blending: THREE.AdditiveBlending,
     fog,
   });
   const glowMat = new THREE.PointsMaterial({
@@ -214,7 +214,7 @@ export function createConstellationLayer(opts) {
     sizeAttenuation,
     map: dot || null,
     transparent: true,
-    opacity: 0.28,
+    opacity: 0.48,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
     fog,

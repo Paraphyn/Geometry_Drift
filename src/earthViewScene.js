@@ -381,11 +381,11 @@ export function createEarthViewScene(renderer, opts = {}) {
   // Brighter constellation layer (real-ish sky placement via RA/Dec).
   const constellations = createConstellationLayer({
     radius: STAR_RADIUS,
-    sizeCore: 2.4,
-    sizeGlow: 6.4,
+    sizeCore: 3.2,
+    sizeGlow: 10.5,
     sizeAttenuation: false,
     fog: false,
-    showLines: true,
+    showLines: false,
   });
   voidGroup.add(constellations);
   scene.add(voidGroup);

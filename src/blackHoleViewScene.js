@@ -57,11 +57,11 @@ export function createBlackHoleViewScene(renderer) {
   // Brighter constellation layer (real-ish sky placement via RA/Dec).
   const constellations = createConstellationLayer({
     radius: 220,
-    sizeCore: 0.28,
-    sizeGlow: 0.78,
+    sizeCore: 0.42,
+    sizeGlow: 1.25,
     sizeAttenuation: true,
     fog: false,
-    showLines: true,
+    showLines: false,
   });
   scene.add(constellations);
 
