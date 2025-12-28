@@ -385,7 +385,6 @@ export function createEarthViewScene(renderer, opts = {}) {
     sizeGlow: 6.4,
     sizeAttenuation: false,
     fog: false,
-    showLines: true,
   });
   voidGroup.add(constellations);
   scene.add(voidGroup);
@@ -489,6 +488,7 @@ export function createEarthViewScene(renderer, opts = {}) {
 
   function update(_dt) {
     controls.update();
+    constellations.userData?.update?.(_dt);
     // Keep the "void" centered around the camera, but in world space (no camera parenting).
     voidGroup.position.copy(camera.position);
     if (!modelRoot) {

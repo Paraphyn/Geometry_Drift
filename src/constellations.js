@@ -52,6 +52,61 @@ function createSoftDotTexture(size = 64) {
   return tex;
 }
 
+function createStarBeamTexture(size = 128) {
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  const cx = size * 0.5;
+  const cy = size * 0.5;
+
+  // Soft core
+  const core = ctx.createRadialGradient(cx, cy, 0, cx, cy, size * 0.5);
+  core.addColorStop(0.0, 'rgba(255,255,255,0.95)');
+  core.addColorStop(0.25, 'rgba(255,255,255,0.55)');
+  core.addColorStop(0.7, 'rgba(255,255,255,0.10)');
+  core.addColorStop(1.0, 'rgba(255,255,255,0.00)');
+  ctx.fillStyle = core;
+  ctx.fillRect(0, 0, size, size);
+
+  // Beam spikes (simple starburst)
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.globalCompositeOperation = 'lighter';
+
+  const beams = 6;
+  const beamLen = size * 0.48;
+  const beamW = Math.max(1.5, size * 0.012);
+  for (let i = 0; i < beams; i++) {
+    const a = (i / beams) * Math.PI;
+    ctx.save();
+    ctx.rotate(a);
+
+    const g = ctx.createLinearGradient(0, 0, beamLen, 0);
+    g.addColorStop(0.0, 'rgba(255,255,255,0.00)');
+    g.addColorStop(0.2, 'rgba(255,255,255,0.18)');
+    g.addColorStop(0.5, 'rgba(255,255,255,0.30)');
+    g.addColorStop(1.0, 'rgba(255,255,255,0.00)');
+
+    ctx.strokeStyle = g;
+    ctx.lineWidth = beamW;
+    ctx.beginPath();
+    ctx.moveTo(-beamLen, 0);
+    ctx.lineTo(beamLen, 0);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+  ctx.restore();
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.needsUpdate = true;
+  return tex;
+}
+
 /**
  * A small curated set of bright stars per requested constellations (J2000-ish).
  * Coordinates are approximate but preserve real relative placement on the sky.
@@ -100,49 +155,6 @@ const STARS = [
   { id: 'sco_lesath', label: 'Lesath', ra: 17.5125, dec: -37.2956, mag: 2.7 },
 ];
 
-/** @type {Array<[string,string]>} */
-const EDGES = [
-  // Orion
-  ['ori_betelgeuse', 'ori_bellatrix'],
-  ['ori_bellatrix', 'ori_mintaka'],
-  ['ori_mintaka', 'ori_alnilam'],
-  ['ori_alnilam', 'ori_alnitak'],
-  ['ori_alnitak', 'ori_saiph'],
-  ['ori_saiph', 'ori_rigel'],
-  ['ori_rigel', 'ori_betelgeuse'],
-
-  // Ursa Major
-  ['uma_dubhe', 'uma_merak'],
-  ['uma_merak', 'uma_phecda'],
-  ['uma_phecda', 'uma_megrez'],
-  ['uma_megrez', 'uma_alioth'],
-  ['uma_alioth', 'uma_mizar'],
-  ['uma_mizar', 'uma_alkaid'],
-  ['uma_megrez', 'uma_dubhe'],
-
-  // Ursa Minor
-  ['umi_polaris', 'umi_yildun'],
-  ['umi_yildun', 'umi_epsilon'],
-  ['umi_epsilon', 'umi_zeta'],
-  ['umi_zeta', 'umi_eta'],
-  ['umi_eta', 'umi_pherkad'],
-  ['umi_pherkad', 'umi_kochab'],
-  ['umi_kochab', 'umi_polaris'],
-
-  // Cassiopeia
-  ['cas_caph', 'cas_schedar'],
-  ['cas_schedar', 'cas_tsih'],
-  ['cas_tsih', 'cas_ruchbah'],
-  ['cas_ruchbah', 'cas_segin'],
-
-  // Scorpius (simple spine + tail)
-  ['sco_dschubba', 'sco_acrab'],
-  ['sco_acrab', 'sco_antares'],
-  ['sco_antares', 'sco_sargas'],
-  ['sco_sargas', 'sco_shaula'],
-  ['sco_shaula', 'sco_lesath'],
-];
-
 /**
  * Creates a brighter “constellation layer” (stars + optional connecting lines),
  * placed using approximate real sky coordinates (RA/Dec).
@@ -153,7 +165,6 @@ const EDGES = [
  *  sizeGlow?: number,
  *  sizeAttenuation?: boolean,
  *  fog?: boolean,
- *  showLines?: boolean,
  * }} opts
  */
 export function createConstellationLayer(opts) {
@@ -162,7 +173,6 @@ export function createConstellationLayer(opts) {
   const sizeGlow = opts.sizeGlow ?? sizeCore * 2.5;
   const sizeAttenuation = opts.sizeAttenuation ?? true;
   const fog = opts.fog ?? false;
-  const showLines = opts.showLines ?? false;
 
   const group = new THREE.Group();
   group.name = 'ConstellationLayer';
@@ -170,12 +180,9 @@ export function createConstellationLayer(opts) {
   const positions = new Float32Array(STARS.length * 3);
   const colors = new Float32Array(STARS.length * 3);
 
-  /** @type {Record<string, { idx:number, p:THREE.Vector3 }>} */
-  const byId = {};
   for (let i = 0; i < STARS.length; i++) {
     const s = STARS[i];
     const p = radecToXYZ(s.ra, s.dec, radius);
-    byId[s.id] = { idx: i, p };
     const j = i * 3;
     positions[j + 0] = p.x;
     positions[j + 1] = p.y;
@@ -195,6 +202,7 @@ export function createConstellationLayer(opts) {
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
   const dot = createSoftDotTexture(64);
+  const beam = createStarBeamTexture(128);
 
   const coreMat = new THREE.PointsMaterial({
     color: 0xffffff,
@@ -224,38 +232,53 @@ export function createConstellationLayer(opts) {
     depthTest: false,
     fog,
   });
+  const beamMat = new THREE.PointsMaterial({
+    color: 0xffffff,
+    vertexColors: true,
+    size: sizeGlow * 2.25,
+    sizeAttenuation,
+    map: beam || dot || null,
+    transparent: true,
+    opacity: 0.18,
+    alphaTest: 0.01,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    depthTest: false,
+    fog,
+  });
 
   const starsGlow = new THREE.Points(geo, glowMat);
   const starsCore = new THREE.Points(geo, coreMat);
+  const starsBeam = new THREE.Points(geo, beamMat);
   starsGlow.frustumCulled = false;
   starsCore.frustumCulled = false;
+  starsBeam.frustumCulled = false;
 
-  group.add(starsGlow, starsCore);
+  group.add(starsBeam, starsGlow, starsCore);
 
-  if (showLines) {
-    const segs = [];
-    for (const [a, b] of EDGES) {
-      const pa = byId[a]?.p;
-      const pb = byId[b]?.p;
-      if (!pa || !pb) continue;
-      segs.push(pa.x, pa.y, pa.z, pb.x, pb.y, pb.z);
-    }
-    if (segs.length) {
-      const lineGeo = new THREE.BufferGeometry();
-      lineGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(segs), 3));
-      const lineMat = new THREE.LineBasicMaterial({
-        color: 0xbfd2ff,
-        transparent: true,
-        opacity: 0.22,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-        fog,
-      });
-      const lines = new THREE.LineSegments(lineGeo, lineMat);
-      lines.frustumCulled = false;
-      group.add(lines);
-    }
-  }
+  // Slow “beaming” glow animation for constellation stars.
+  // Views should call group.userData.update(dt) each frame.
+  let t = 0;
+  const base = {
+    glowOpacity: glowMat.opacity,
+    glowSize: glowMat.size,
+    beamOpacity: beamMat.opacity,
+    beamSize: beamMat.size,
+  };
+  group.userData.update = (dt) => {
+    t += dt;
+    const s = 0.5 + 0.5 * Math.sin(t * 0.6); // slow pulse
+    const p = 0.75 + 0.25 * s;
+
+    glowMat.opacity = base.glowOpacity * (0.78 + 0.45 * s);
+    glowMat.size = base.glowSize * (0.92 + 0.14 * s);
+
+    beamMat.opacity = base.beamOpacity * (0.70 + 0.75 * s);
+    beamMat.size = base.beamSize * (0.90 + 0.18 * s);
+
+    // Subtle breathing in the core so the constellation feels “alive”
+    coreMat.opacity = 0.92 + 0.08 * p;
+  };
 
   return group;
 }

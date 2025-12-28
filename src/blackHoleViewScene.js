@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { createConstellationLayer } from './constellations.js';
+import { createSunRig } from './sun.js';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
@@ -61,9 +62,16 @@ export function createBlackHoleViewScene(renderer) {
     sizeGlow: 0.78,
     sizeAttenuation: true,
     fog: false,
-    showLines: true,
   });
   scene.add(constellations);
+
+  // Distant sun (kept far from the black hole center direction).
+  const sun = createSunRig({
+    // Off-axis so it’s not sitting on the black-hole center; rotate to find it.
+    position: new THREE.Vector3(235, 75, -90),
+    radius: 7,
+  });
+  scene.add(sun.object);
 
   // ----------------------------
   // Post (fullscreen black hole pass)
@@ -165,6 +173,9 @@ export function createBlackHoleViewScene(renderer) {
   // API
   // ----------------------------
   function update(dt) {
+    constellations.userData?.update?.(dt);
+    sun.update(dt, camera);
+
     const pos = geo.attributes.position.array;
     for (let i = 0; i < STAR_COUNT; i++) {
       const idx = i * 3 + 2;
